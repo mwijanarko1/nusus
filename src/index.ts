@@ -5,6 +5,7 @@ export type {
   AuthorSummary,
   Book,
   BookSummary,
+  Category,
   CategorySummary,
   Passage,
   RetrievedContext,

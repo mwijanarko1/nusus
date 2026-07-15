@@ -97,24 +97,26 @@ if (madhhab) {
     searchQueries.push({ q: `${query} ${book}`, tier: 3, source_type: `book:${madhhab}` });
   }
 } else if (books) {
-  for (const b of books) searchQueries.push({ q: `${query} ${b}`, tier: 3, source_type: "targeted" });
+  for (const title of books) {
+    const match = turath.findBooks(title, { limit: 1 })[0];
+    if (match) searchQueries.push({ q: query, tier: 3, source_type: "targeted", bookId: match.id, matched_term: title });
+  }
 }
 searchQueries.push({ q: query, tier: 4, source_type: "broad" });
 
 // === execute ===
 const seen = new Set();
 const collected = [];
-const scope = bookId ? { bookIds: [bookId] } : undefined;
-
 for (const sq of searchQueries) {
   if (collected.length >= maxResults * 3) break;
   try {
-    const result = await turath.search(sq.q, scope ? { ...scope } : {});
+    const selectedBookId = sq.bookId ?? bookId;
+    const result = await turath.search(sq.q, selectedBookId ? { bookIds: [selectedBookId] } : {});
     for (const hit of result.items) {
       const key = `${hit.book.id}:${hit.location.internalPage ?? ""}`;
       if (seen.has(key)) continue;
       seen.add(key);
-      collected.push({ hit, tier: sq.tier, source_type: sq.source_type, matched_term: sq.q.replace(query, "").trim() });
+      collected.push({ hit, tier: sq.tier, source_type: sq.source_type, matched_term: sq.matched_term ?? sq.q.replace(query, "").trim() });
     }
   } catch {
     // skip failed tier queries; broad fallback still runs

@@ -2,6 +2,7 @@ import { NususError } from "../errors.js";
 import type { Book, Passage, RetrievedContext, SearchPage, TurathId } from "../models.js";
 import { createTransport, type TransportOptions } from "../transport.js";
 import { formatCitation, getSourceUrl, type CitationSource } from "./citations.js";
+import { findCatalogBooks, listCatalogCategories } from "./catalog.js";
 import { normalizeAuthor, normalizeBook, normalizePage, normalizeSearchHit } from "./normalize.js";
 import type { RawSearch } from "./raw-types.js";
 
@@ -186,6 +187,8 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
   };
 
   return {
+    findBooks: findCatalogBooks,
+    listCategories: listCatalogCategories,
     getAuthor,
     getBook,
     getPage,

@@ -40,6 +40,16 @@ describe("Turath client", () => {
     expect(normalizedPage.url).toBe("https://app.turath.io/book/147927?page=5");
   });
 
+  test("discovers books and categories from the bundled catalog without HTTP", () => {
+    calls.length = 0;
+    const books = client.findBooks("المُدَوَّنة", { categoryIds: [15] });
+    const categories = client.listCategories();
+
+    expect(books[0]).toMatchObject({ id: "587", title: "المدونة", author: { id: "214" }, category: { id: "15" } });
+    expect(categories.find((category) => category.id === "15")).toMatchObject({ title: "الفقه المالكي", bookCount: 79 });
+    expect(calls).toHaveLength(0);
+  });
+
   test("maps public search filters to verified upstream parameters", async () => {
     calls.length = 0;
     const result = await client.search("الإسلام", { bookIds: [147927], sort: "page" });

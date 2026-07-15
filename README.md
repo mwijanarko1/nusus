@@ -12,6 +12,8 @@ bun add nusus
 import { createTurathClient } from "nusus/turath";
 
 const turath = createTurathClient({ timeout: 10_000 });
+const books = turath.findBooks("الأربعون النووية");
+const categories = turath.listCategories();
 const results = await turath.search("إنما الأعمال بالنيات", {
   bookIds: [147927],
 });
@@ -48,7 +50,7 @@ The CLI emits JSON Lines with passage text, source metadata, citations, and dire
 
 ## Known limitations
 
-Turath does not expose verified catalog-discovery endpoints, so book, author, and category filters require numeric IDs. Browser support is not claimed because the checked API responses do not advertise CORS support.
+Book and category discovery uses a bundled snapshot of 8,124 Turath books scanned in March 2026 because Turath does not expose verified catalog endpoints. Newly added or changed upstream records may therefore be absent until the snapshot is refreshed. Author-name discovery is not yet available; catalog books retain their author IDs. Browser support is not claimed because the checked API responses do not advertise CORS support.
 
 ## Development
 

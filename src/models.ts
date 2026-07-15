@@ -10,6 +10,12 @@ export type CategorySummary = {
   title?: string;
 };
 
+export type Category = CategorySummary & {
+  provider: "turath";
+  title: string;
+  bookCount: number;
+};
+
 export type BookSummary = {
   id: string;
   title: string;

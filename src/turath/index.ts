@@ -1,4 +1,6 @@
 export { createTurathClient } from "./client.js";
+export { findCatalogBooks as findBooks, listCatalogCategories as listCategories } from "./catalog.js";
+export type { FindBooksOptions } from "./catalog.js";
 export type {
   ContextOptions,
   RequestOptions,
