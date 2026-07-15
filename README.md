@@ -4,6 +4,8 @@ TypeScript SDK for retrieving citable context from classical Islamic and Arabic 
 
 ```bash
 npm install nusus
+# or
+bun add nusus
 ```
 
 ```ts
@@ -34,10 +36,12 @@ All requests support `AbortSignal`; failures use the exported `NususError` codes
 ## Agent CLI
 
 ```bash
-bun run build
-node scripts/search.mjs "إنما الأعمال بالنيات" 3
-node scripts/search.mjs --book-id 147927 "النية" 3
-node scripts/search.mjs --page 147927 5
+npx nusus "إنما الأعمال بالنيات" 3
+npx nusus --book-id 147927 "النية" 3
+npx nusus --page 147927 5
+
+# Bun
+bunx nusus "إنما الأعمال بالنيات" 3
 ```
 
 The CLI emits JSON Lines with passage text, source metadata, citations, and direct Turath URLs. It also supports `--madhhab hanafi|maliki|shafii|hanbali` and `--books "title one,title two"`.
