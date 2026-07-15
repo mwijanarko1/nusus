@@ -1,6 +1,6 @@
 # Nusus
 
-TypeScript SDK for retrieving citable context from classical Islamic and Arabic texts. The first provider is [Turath](https://app.turath.io/).
+TypeScript SDK for searching and citing classical Islamic and Arabic texts through [Turath](https://app.turath.io/), a Shamela-style digital library. Use Nusus to retrieve source text, metadata, citations, and direct links from Arabic heritage books for research tools and AI agents.
 
 ```bash
 npm install nusus

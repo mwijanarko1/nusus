@@ -1,7 +1,18 @@
 {
   "name": "nusus",
-  "version": "0.2.0",
-  "description": "Citable context from classical Islamic and Arabic texts",
+  "version": "0.2.1",
+  "description": "TypeScript SDK for searching and citing classical Islamic and Arabic texts via Turath, a Shamela-style digital library",
+  "keywords": [
+    "turath",
+    "shamela",
+    "maktaba-shamela",
+    "islamic-texts",
+    "arabic-books",
+    "hadith",
+    "fiqh",
+    "typescript",
+    "sdk"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/mwijanarko1/nusus.git"
