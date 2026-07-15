@@ -1,0 +1,33 @@
+{
+  "name": "nusus",
+  "version": "0.1.0",
+  "description": "Citable context from classical Islamic and Arabic texts",
+  "repository": "github:mwijanarko1/nusus",
+  "homepage": "https://github.com/mwijanarko1/nusus#readme",
+  "bugs": "https://github.com/mwijanarko1/nusus/issues",
+  "type": "module",
+  "files": ["dist", "README.md", "LICENSE"],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./turath": {
+      "types": "./dist/turath/index.d.ts",
+      "import": "./dist/turath/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "bun test",
+    "test:live": "NUSUS_LIVE=1 bun test ./tests/live.test.ts"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}
