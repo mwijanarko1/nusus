@@ -2,13 +2,21 @@
   "name": "nusus",
   "version": "0.1.0",
   "description": "Citable context from classical Islamic and Arabic texts",
-  "repository": "github:mwijanarko1/nusus",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mwijanarko1/nusus.git"
+  },
   "homepage": "https://github.com/mwijanarko1/nusus#readme",
   "bugs": "https://github.com/mwijanarko1/nusus/issues",
   "type": "module",
-  "files": ["dist", "scripts/search.mjs", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "scripts/search.mjs",
+    "README.md",
+    "LICENSE"
+  ],
   "bin": {
-    "nusus": "./scripts/search.mjs"
+    "nusus": "scripts/search.mjs"
   },
   "exports": {
     ".": {
