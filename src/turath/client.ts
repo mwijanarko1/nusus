@@ -1,8 +1,22 @@
 import { NususError } from "../errors.js";
-import type { Book, Passage, RetrievedContext, SearchPage, TurathId } from "../models.js";
+import type {
+  Book,
+  Passage,
+  PassageProvenance,
+  RetrievedContext,
+  RetrieveScope,
+  SearchPage,
+  TurathId,
+} from "../models.js";
 import { createTransport, type TransportOptions } from "../transport.js";
-import { formatCitation, getSourceUrl, type CitationSource } from "./citations.js";
-import { findCatalogBooks, listCatalogCategories } from "./catalog.js";
+import { decoratePassage, formatCitation, getLocator, getSourceUrl, type CitationSource } from "./citations.js";
+import {
+  findCatalogAuthors,
+  findCatalogBooks,
+  getCatalogMetadata,
+  listCatalogCategories,
+} from "./catalog.js";
+import { boundText } from "./excerpt.js";
 import { normalizeAuthor, normalizeBook, normalizePage, normalizeSearchHit } from "./normalize.js";
 import type { RawSearch } from "./raw-types.js";
 
@@ -24,11 +38,9 @@ export type ContextOptions = RequestOptions & {
 export type RetrieveOptions = RequestOptions & {
   maxPassages?: number;
   maxCharsPerPassage?: number;
-  scope?: {
-    bookIds?: TurathId[];
-    authorIds?: TurathId[];
-    categoryIds?: TurathId[];
-  };
+  pagesBefore?: number;
+  pagesAfter?: number;
+  scope?: RetrieveScope;
 };
 
 export type TurathClientOptions = TransportOptions;
@@ -52,12 +64,6 @@ const only = (values: TurathId[] | undefined, name: string): string | undefined 
     throw new NususError("INVALID_ARGUMENT", `Turath currently supports only one ${name} filter per search`);
   }
   return id(values[0]!, name);
-};
-
-const truncate = (text: string, maxChars: number): string => {
-  const cut = text.slice(0, maxChars);
-  // avoid ending on a lone high surrogate (split code point)
-  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
 };
 
 const emptyObject = (value: unknown): boolean =>
@@ -159,13 +165,19 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
       }
     }
     const headings = [...new Set(pages.flatMap((page) => page.headings))];
-    const result = { ...source, text: pages.map((page) => page.text).join("\n\n"), headings, raw: pages.map((page) => page.raw) };
-    return { ...result, citation: formatCitation(result), url: getSourceUrl(result) };
+    return decoratePassage({
+      ...source,
+      text: pages.map((page) => page.text).join("\n\n"),
+      headings,
+      raw: pages.map((page) => page.raw),
+    });
   };
 
   const retrieve = async (query: string, options: RetrieveOptions = {}): Promise<RetrievedContext> => {
     const maxPassages = integer(options.maxPassages ?? 5, "maxPassages", 1);
     const maxChars = integer(options.maxCharsPerPassage ?? 4_000, "maxCharsPerPassage", 1);
+    const pagesBefore = integer(options.pagesBefore ?? 0, "pagesBefore");
+    const pagesAfter = integer(options.pagesAfter ?? 0, "pagesAfter");
     const searchOptions = { ...options.scope, signal: options.signal };
     const first = await search(query, searchOptions);
     const hits = first.items.slice(0, maxPassages);
@@ -175,12 +187,29 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
       hits.push(...next.items.slice(0, maxPassages - hits.length));
     }
     const passages = await Promise.all(
-      hits.map(async (hit) => {
-        const page = hit.location.internalPage === undefined
-          ? hit
-          : await getPage(hit.book.id, hit.location.internalPage, { signal: options.signal });
-        const bounded = { ...page, snippet: hit.snippet, text: truncate(page.text, maxChars) };
-        return { ...bounded, citation: formatCitation(bounded), url: getSourceUrl(bounded) };
+      hits.map(async (hit, rank) => {
+        let page: Passage;
+        if (hit.location.internalPage === undefined) {
+          page = hit;
+        } else if (pagesBefore > 0 || pagesAfter > 0) {
+          page = await getContext(hit, { pagesBefore, pagesAfter, signal: options.signal });
+        } else {
+          page = await getPage(hit.book.id, hit.location.internalPage, { signal: options.signal });
+        }
+
+        const bound = boundText(page.text, maxChars, hit.snippet);
+        const bounded = decoratePassage({ ...page, snippet: hit.snippet, text: bound.text });
+        const provenance: PassageProvenance = {
+          query,
+          ...(options.scope && { scope: options.scope }),
+          rank,
+          totalMatches: first.totalMatches,
+          truncated: bound.truncated,
+          ...(bound.truncation && { truncation: bound.truncation }),
+          contextPages: { before: pagesBefore, after: pagesAfter },
+          retrievedVia: hit.location.internalPage === undefined ? "search-hit" : "page",
+        };
+        return { ...bounded, provenance };
       }),
     );
     return { passages, totalMatches: first.totalMatches, query };
@@ -188,7 +217,9 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
 
   return {
     findBooks: findCatalogBooks,
+    findAuthors: findCatalogAuthors,
     listCategories: listCatalogCategories,
+    getCatalogMetadata,
     getAuthor,
     getBook,
     getPage,
@@ -198,6 +229,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     getContext,
     retrieve,
     formatCitation: (source: CitationSource) => formatCitation(source),
+    getLocator: (source: CitationSource) => getLocator(source),
     getSourceUrl: (source: CitationSource) => getSourceUrl(source),
   };
 };

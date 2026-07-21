@@ -36,8 +36,15 @@ describe("Turath client", () => {
     expect(normalizedBook.title).toBe("الأربعون النووية مع زيادات ابن رجب");
     expect(normalizedBook.author?.id).toBe("44");
     expect(normalizedPage.headings).toContain("الحديث الأول: [الأعمال بالنيات]");
-    expect(normalizedPage.citation).toBe("النووي، الأربعون النووية مع زيادات ابن رجب، ج 1، ص 5");
+    expect(normalizedPage.citation).toBe("النووي، الأربعون النووية مع زيادات ابن رجب، ج 1، ص 5، صفحة تراث 5، تراث 147927");
     expect(normalizedPage.url).toBe("https://app.turath.io/book/147927?page=5");
+    expect(normalizedPage.locator).toEqual({
+      bookId: "147927",
+      internalPage: 5,
+      printedPage: 5,
+      volume: "1",
+      url: "https://app.turath.io/book/147927?page=5",
+    });
   });
 
   test("discovers books and categories from the bundled catalog without HTTP", () => {
@@ -101,5 +108,232 @@ describe("Turath client", () => {
       expect(error).toBeInstanceOf(NususError);
       expect(error).toMatchObject({ code: "NOT_FOUND" });
     }
+  });
+});
+
+describe("retrieve context and provenance", () => {
+  test("centers excerpts on the search match instead of the page prefix", async () => {
+    const prefix = "أ".repeat(200);
+    const match = "كلمة_البحث_المميزة";
+    const suffix = "ب".repeat(200);
+    const pageText = `${prefix}${match}${suffix}`;
+    const smart = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          return Response.json({
+            meta: JSON.stringify({
+              headings: [],
+              page_id: 9,
+              page: 9,
+              vol: "1",
+              book_name: "كتاب الاختبار",
+              author_name: "مؤلف",
+            }),
+            text: pageText,
+          });
+        }
+        return Response.json({
+          count: 1,
+          data: [{
+            book_id: 1,
+            cat_id: 1,
+            author_id: 1,
+            meta: JSON.stringify({
+              headings: [],
+              page_id: 9,
+              page: 9,
+              vol: "1",
+              book_name: "كتاب الاختبار",
+              author_name: "مؤلف",
+            }),
+            snip: `مقدمة <em>${match}</em> خاتمة`,
+            text: pageText,
+          }],
+        });
+      }) as typeof fetch,
+    });
+
+    const result = await smart.retrieve("كلمة", { maxPassages: 1, maxCharsPerPassage: 80 });
+    const passage = result.passages[0]!;
+    expect(passage.text).toContain(match);
+    expect(passage.text.startsWith("أ".repeat(80))).toBe(false);
+    expect(passage.provenance?.truncated).toBe(true);
+    expect(passage.provenance?.truncation).toBe("match-window");
+    expect(passage.provenance?.rank).toBe(0);
+    expect(passage.provenance?.query).toBe("كلمة");
+    expect(passage.locator?.bookId).toBe("1");
+    expect(passage.locator?.internalPage).toBe(9);
+    expect(passage.locator?.url).toContain("page=9");
+  });
+
+  test("falls back to prefix truncation when no snippet match exists", async () => {
+    const pageText = `${"أ".repeat(120)}نهاية`;
+    const plain = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          return Response.json({
+            meta: JSON.stringify({
+              headings: [],
+              page_id: 2,
+              page: 2,
+              book_name: "كتاب",
+            }),
+            text: pageText,
+          });
+        }
+        return Response.json({
+          count: 1,
+          data: [{
+            book_id: 2,
+            meta: JSON.stringify({ headings: [], page_id: 2, page: 2, book_name: "كتاب" }),
+            text: pageText,
+          }],
+        });
+      }) as typeof fetch,
+    });
+
+    const result = await plain.retrieve("بحث", { maxPassages: 1, maxCharsPerPassage: 40 });
+    expect(result.passages[0]?.text).toBe("أ".repeat(40));
+    expect(result.passages[0]?.provenance?.truncation).toBe("prefix");
+  });
+
+  test("includes adjacent pages only when requested", async () => {
+    const pages: string[] = [];
+    const adjacent = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          const pg = url.searchParams.get("pg") ?? "?";
+          pages.push(pg);
+          return Response.json({
+            meta: JSON.stringify({
+              headings: [`h${pg}`],
+              page_id: Number(pg),
+              page: Number(pg),
+              book_name: "كتاب",
+              author_name: "مؤلف",
+            }),
+            text: `نص الصفحة ${pg}`,
+          });
+        }
+        return Response.json({
+          count: 1,
+          data: [{
+            book_id: 3,
+            meta: JSON.stringify({ headings: [], page_id: 5, page: 5, book_name: "كتاب", author_name: "مؤلف" }),
+            snip: "نص",
+            text: "نص الصفحة 5",
+          }],
+        });
+      }) as typeof fetch,
+    });
+
+    const one = await adjacent.retrieve("نص", { maxPassages: 1, maxCharsPerPassage: 500 });
+    expect(one.passages[0]?.text).toBe("نص الصفحة 5");
+    expect(one.passages[0]?.provenance?.contextPages).toEqual({ before: 0, after: 0 });
+
+    pages.length = 0;
+    const wide = await adjacent.retrieve("نص", {
+      maxPassages: 1,
+      maxCharsPerPassage: 500,
+      pagesBefore: 1,
+      pagesAfter: 1,
+    });
+    expect(pages.sort()).toEqual(["4", "5", "6"]);
+    expect(wide.passages[0]?.text).toContain("نص الصفحة 4");
+    expect(wide.passages[0]?.text).toContain("نص الصفحة 5");
+    expect(wide.passages[0]?.text).toContain("نص الصفحة 6");
+    expect(wide.passages[0]?.provenance?.contextPages).toEqual({ before: 1, after: 1 });
+  });
+
+  test("echoes retrieve scope in provenance", async () => {
+    const result = await client.retrieve("الإسلام", {
+      maxPassages: 1,
+      maxCharsPerPassage: 100,
+      scope: { bookIds: [147927] },
+    });
+    expect(result.passages[0]?.provenance?.scope).toEqual({ bookIds: [147927] });
+    expect(result.passages[0]?.provenance?.totalMatches).toBe(search.count);
+    expect(result.passages[0]?.provenance).not.toHaveProperty("catalogScannedAt");
+  });
+
+  test("maxCharsPerPassage hard-caps long em matches and long plain snippets", async () => {
+    const longMatch = "مميزة".repeat(40); // 200 chars
+    const pageText = `${"أ".repeat(80)}${longMatch}${"ب".repeat(80)}`;
+    const make = (snip: string) => createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          return Response.json({
+            meta: JSON.stringify({ headings: [], page_id: 3, page: 3, book_name: "كتاب" }),
+            text: pageText,
+          });
+        }
+        return Response.json({
+          count: 1,
+          data: [{
+            book_id: 3,
+            meta: JSON.stringify({ headings: [], page_id: 3, page: 3, book_name: "كتاب" }),
+            snip,
+            text: pageText,
+          }],
+        });
+      }) as typeof fetch,
+    });
+
+    const em = await make(`قبل <em>${longMatch}</em> بعد`).retrieve("مميزة", {
+      maxPassages: 1,
+      maxCharsPerPassage: 30,
+    });
+    expect(em.passages[0]!.text.length).toBeLessThanOrEqual(30);
+    expect(em.passages[0]!.text.length).toBeGreaterThan(0);
+    expect(longMatch).toContain(em.passages[0]!.text);
+    expect(em.passages[0]!.provenance?.truncation).toBe("match-window");
+
+    const plain = await make(longMatch).retrieve("مميزة", {
+      maxPassages: 1,
+      maxCharsPerPassage: 30,
+    });
+    expect(plain.passages[0]!.text.length).toBeLessThanOrEqual(30);
+    expect(longMatch).toContain(plain.passages[0]!.text);
+    expect(plain.passages[0]!.text).toContain("مميزة");
+    expect(plain.passages[0]!.provenance?.truncation).toBe("match-window");
+  });
+
+  test("locates matches inside malformed nested Turath snippet HTML", async () => {
+    const pageText = `${"أ".repeat(120)}لب الإسلام لب${"ب".repeat(120)}`;
+    const snip = '<span data-type="title" id=toc-26>الحديث الحادي والعشرون: [الاستقامة لُبُّ <em>الإسلام]</span></em>\nعَنْ أَبِي عَمْرٍو';
+    const broken = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          return Response.json({
+            meta: JSON.stringify({ headings: [], page_id: 25, page: 25, book_name: "كتاب" }),
+            text: pageText,
+          });
+        }
+        return Response.json({
+          count: 1,
+          data: [{
+            book_id: 25,
+            meta: JSON.stringify({ headings: [], page_id: 25, page: 25, book_name: "كتاب" }),
+            snip,
+            text: pageText,
+          }],
+        });
+      }) as typeof fetch,
+    });
+
+    const result = await broken.retrieve("الإسلام", {
+      maxPassages: 1,
+      maxCharsPerPassage: 40,
+    });
+    const passage = result.passages[0]!;
+    expect(passage.text.length).toBeLessThanOrEqual(40);
+    expect(passage.text).toContain("الإسلام");
+    expect(passage.text.startsWith("أ".repeat(40))).toBe(false);
+    expect(passage.provenance?.truncation).toBe("match-window");
   });
 });

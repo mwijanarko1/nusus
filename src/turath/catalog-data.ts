@@ -1,4 +1,5 @@
 // Generated from the Turath metadata snapshot scanned 2026-03-23.
+export const CATALOG_SCANNED_AT = "2026-03-23";
 // Tuple: [book id, Arabic title, author id, category id].
 // Keep this compact: source descriptions and PDF metadata are intentionally omitted.
 

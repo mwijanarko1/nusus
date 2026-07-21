@@ -1,6 +1,6 @@
 {
   "name": "nusus",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "TypeScript SDK for searching and citing classical Islamic and Arabic texts via Turath, a Shamela-style digital library",
   "keywords": [
     "turath",
@@ -44,7 +44,9 @@
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test",
-    "test:live": "NUSUS_LIVE=1 bun test ./tests/live.test.ts"
+    "test:live": "NUSUS_LIVE=1 bun test ./tests/live.test.ts",
+    "catalog:authors": "bun scripts/refresh-catalog.mjs authors",
+    "catalog:books": "bun scripts/refresh-catalog.mjs books"
   },
   "devDependencies": {
     "typescript": "^5.8.3"

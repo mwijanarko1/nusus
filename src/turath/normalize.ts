@@ -1,6 +1,6 @@
 import { NususError } from "../errors.js";
 import type { Author, Book, Passage } from "../models.js";
-import { formatCitation, getSourceUrl } from "./citations.js";
+import { decoratePassage } from "./citations.js";
 import type { RawAuthor, RawBook, RawPage, RawPageMeta, RawSearchHit } from "./raw-types.js";
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -21,10 +21,7 @@ const parseMeta = (value: unknown): RawPageMeta => {
   }
 };
 
-const passage = (input: Omit<Passage, "url" | "citation">): Passage => {
-  const source = { author: input.author, book: input.book, location: input.location };
-  return { ...input, url: getSourceUrl(source), citation: formatCitation(source) };
-};
+const passage = (input: Omit<Passage, "url" | "citation" | "locator">): Passage => decoratePassage(input);
 
 export const normalizeAuthor = (raw: unknown): Author => {
   if (!record(raw) || typeof raw.id !== "number" || typeof raw.name !== "string") {

@@ -44,6 +44,31 @@ export type SourceLocation = {
   volume?: string;
 };
 
+export type SourceLocator = {
+  bookId: string;
+  internalPage?: number;
+  printedPage?: number;
+  volume?: string;
+  url: string;
+};
+
+export type RetrieveScope = {
+  bookIds?: TurathId[];
+  authorIds?: TurathId[];
+  categoryIds?: TurathId[];
+};
+
+export type PassageProvenance = {
+  query: string;
+  scope?: RetrieveScope;
+  rank: number;
+  totalMatches: number;
+  truncated: boolean;
+  truncation?: "prefix" | "match-window";
+  contextPages: { before: number; after: number };
+  retrievedVia: "page" | "search-hit";
+};
+
 export type Passage = {
   provider: "turath";
   book: BookSummary;
@@ -55,6 +80,8 @@ export type Passage = {
   headings: string[];
   url: string;
   citation: string;
+  locator?: SourceLocator;
+  provenance?: PassageProvenance;
   raw?: unknown;
 };
 
@@ -68,4 +95,16 @@ export type RetrievedContext = {
   passages: Passage[];
   totalMatches: number;
   query: string;
+};
+
+export type CatalogMetadata = {
+  scannedAt: string;
+  bookCount: number;
+  categoryCount: number;
+  /** Distinct author IDs referenced by the bundled book catalog. */
+  authorIdCount: number;
+  /** Bundled offline author names verified via official GET /author. */
+  authorNameCount: number;
+  /** Known catalog author IDs with no verified offline name (missing/empty upstream or not yet hydrated). */
+  unresolvedAuthorIdCount: number;
 };

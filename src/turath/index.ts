@@ -1,6 +1,11 @@
 export { createTurathClient } from "./client.js";
-export { findCatalogBooks as findBooks, listCatalogCategories as listCategories } from "./catalog.js";
-export type { FindBooksOptions } from "./catalog.js";
+export {
+  findCatalogAuthors as findAuthors,
+  findCatalogBooks as findBooks,
+  getCatalogMetadata,
+  listCatalogCategories as listCategories,
+} from "./catalog.js";
+export type { FindAuthorsOptions, FindBooksOptions } from "./catalog.js";
 export type {
   ContextOptions,
   RequestOptions,
@@ -9,5 +14,5 @@ export type {
   TurathClientOptions,
   TurathSearchOptions,
 } from "./client.js";
-export { formatCitation, getSourceUrl } from "./citations.js";
+export { decoratePassage, formatCitation, getLocator, getSourceUrl } from "./citations.js";
 export type { CitationSource } from "./citations.js";
