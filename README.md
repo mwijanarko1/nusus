@@ -1,6 +1,6 @@
 # Nusus
 
-TypeScript SDK for searching and citing classical Islamic and Arabic texts through [Turath](https://app.turath.io/), a Shamela-style digital library. Use Nusus to retrieve source text, metadata, citations, locators, and direct links from Arabic heritage books for research tools and AI agents.
+TypeScript SDK **and agent CLI** for searching and citing classical Islamic and Arabic texts through [Turath](https://app.turath.io/), a Shamela-style digital library. Use Nusus to retrieve source text, metadata, citations, locators, and direct links from Arabic heritage books for research tools and AI agents. The `nusus` binary ships in the same npm package as the SDK.
 
 ```bash
 npm install nusus
@@ -48,23 +48,38 @@ All requests support `AbortSignal`; failures use the exported `NususError` codes
 
 ## Agent CLI
 
+The package installs a `nusus` binary (`scripts/search.mjs`) that wraps the SDK as explicit research tools. Prefer the CLI from agents; use the SDK from application code.
+
 ```bash
-npx nusus --help
-npx nusus --version
-npx nusus find-books "الأربعون النووية" --limit 5
-npx nusus find-books --author-id 44 --limit 10
-npx nusus find-authors "النووي" --limit 5
-npx nusus search "إنما الأعمال بالنيات" --book-id 147927
-npx nusus retrieve "النية" --max-passages 3 --max-chars 2000
-npx nusus get-page --book-id 147927 --page-id 5
-npx nusus get-context --book-id 147927 --page-id 5
-npx nusus get-book 147927
-npx nusus get-author 44
-npx nusus list-categories
-npx nusus catalog
+npm install -g nusus   # or: npx nusus …
+nusus --help
+nusus --version
+
+# Discover (offline bundled catalog)
+nusus find-books "الأربعون النووية" --limit 5
+nusus find-books --author-id 44 --limit 10
+nusus find-authors "النووي" --limit 5
+nusus list-categories
+nusus catalog
+
+# Search / retrieve (live Turath)
+nusus search "إنما الأعمال بالنيات" --book-id 147927
+nusus retrieve "النية" --max-passages 3 --max-chars 2000
+
+# Page / metadata (live)
+nusus get-page --book-id 147927 --page-id 5
+nusus get-context --book-id 147927 --page-id 5 --pages-before 1 --pages-after 1
+nusus get-book 147927
+nusus get-author 44
 ```
 
 Default stdout is **JSONL** (one object per line, camelCase, every line has `type`). Use `--format text` for compact human lines. Diagnostics are JSON on **stderr** only. Unknown or command-inapplicable flags are rejected.
+
+| Record `type` | Commands |
+| --- | --- |
+| `meta` | First line of `find-books`, `find-authors`, `search`, `retrieve` |
+| `book` / `author` / `category` / `catalog` | Discovery + `get-book` / `get-author` |
+| `passage` | `search`, `retrieve`, `get-page`, `get-context` |
 
 | Exit | Meaning |
 | --- | --- |
@@ -74,6 +89,8 @@ Default stdout is **JSONL** (one object per line, camelCase, every line has `typ
 | 3 | Rate limit / HTTP / invalid response / timeout (`ABORTED`) / internal |
 
 `page-id` is Turath’s internal page (`location.internalPage`), not the printed page. `search`/`retrieve` accept at most one `--book-id`, one `--author-id`, and one `--category-id` (filters may be combined). Offline `find-books` accepts repeated `--author-id`/`--category-id` and may omit the title query when those filters are set. `--timeout 0` disables the request timeout (max `600000`). There is no madhhab ranking or multi-book fanout in the CLI.
+
+Repo layout and module boundaries: [`docs/CODEBASE_MAP.md`](docs/CODEBASE_MAP.md). Agent skill copy: [`docs/turath-research-SKILL.md`](docs/turath-research-SKILL.md).
 
 ## Known limitations
 

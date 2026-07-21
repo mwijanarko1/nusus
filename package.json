@@ -1,7 +1,7 @@
 {
   "name": "nusus",
   "version": "0.4.0",
-  "description": "TypeScript SDK for searching and citing classical Islamic and Arabic texts via Turath, a Shamela-style digital library",
+  "description": "TypeScript SDK and agent CLI for searching and citing classical Islamic and Arabic texts via Turath",
   "keywords": [
     "turath",
     "shamela",
@@ -11,7 +11,9 @@
     "hadith",
     "fiqh",
     "typescript",
-    "sdk"
+    "sdk",
+    "cli",
+    "jsonl"
   ],
   "repository": {
     "type": "git",

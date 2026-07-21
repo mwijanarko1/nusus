@@ -1,6 +1,6 @@
 dist/
 node_modules/
-docs/
+docs/chat-log.md
 *.tsbuildinfo
 .pi-subagents/
 .cache/
