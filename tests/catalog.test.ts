@@ -42,4 +42,23 @@ describe("catalog metadata and authors", () => {
     const withAuthor = books.find((book) => book.author?.id === "44");
     expect(withAuthor?.author?.name).toBe("النووي");
   });
+
+  test("findBooks supports author/category filters without a title query", () => {
+    const byAuthor = findCatalogBooks("", { authorIds: [44], limit: 5 });
+    expect(byAuthor.length).toBeGreaterThan(0);
+    expect(byAuthor.every((book) => book.author?.id === "44")).toBe(true);
+
+    const byCategory = findCatalogBooks("", { categoryIds: [15], limit: 3 });
+    expect(byCategory).toHaveLength(3);
+    expect(byCategory.every((book) => book.category?.id === "15")).toBe(true);
+
+    const combined = findCatalogBooks("", { authorIds: [214], categoryIds: [15], limit: 5 });
+    expect(combined.length).toBeGreaterThan(0);
+    expect(combined.every((book) => book.author?.id === "214" && book.category?.id === "15")).toBe(true);
+  });
+
+  test("findBooks rejects empty query without filters", () => {
+    expect(() => findCatalogBooks("")).toThrow(/query must not be empty/);
+    expect(() => findCatalogBooks("   ")).toThrow(/query must not be empty/);
+  });
 });

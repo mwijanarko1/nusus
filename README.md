@@ -49,15 +49,31 @@ All requests support `AbortSignal`; failures use the exported `NususError` codes
 ## Agent CLI
 
 ```bash
-npx nusus "إنما الأعمال بالنيات" 3
-npx nusus --book-id 147927 "النية" 3
-npx nusus --page 147927 5
-
-# Bun
-bunx nusus "إنما الأعمال بالنيات" 3
+npx nusus --help
+npx nusus --version
+npx nusus find-books "الأربعون النووية" --limit 5
+npx nusus find-books --author-id 44 --limit 10
+npx nusus find-authors "النووي" --limit 5
+npx nusus search "إنما الأعمال بالنيات" --book-id 147927
+npx nusus retrieve "النية" --max-passages 3 --max-chars 2000
+npx nusus get-page --book-id 147927 --page-id 5
+npx nusus get-context --book-id 147927 --page-id 5
+npx nusus get-book 147927
+npx nusus get-author 44
+npx nusus list-categories
+npx nusus catalog
 ```
 
-The CLI emits JSON Lines with passage text, source metadata, citations, and direct Turath URLs. It also supports `--madhhab hanafi|maliki|shafii|hanbali` and `--books "title one,title two"`.
+Default stdout is **JSONL** (one object per line, camelCase, every line has `type`). Use `--format text` for compact human lines. Diagnostics are JSON on **stderr** only. Unknown or command-inapplicable flags are rejected.
+
+| Exit | Meaning |
+| --- | --- |
+| 0 | Success (including zero hits; find/search/retrieve emit a `meta` line; offline finders report `returned`, live search/retrieve report `totalMatches`) |
+| 1 | Usage / invalid argument |
+| 2 | Not found |
+| 3 | Rate limit / HTTP / invalid response / timeout (`ABORTED`) / internal |
+
+`page-id` is Turath’s internal page (`location.internalPage`), not the printed page. `search`/`retrieve` accept at most one `--book-id`, one `--author-id`, and one `--category-id` (filters may be combined). Offline `find-books` accepts repeated `--author-id`/`--category-id` and may omit the title query when those filters are set. `--timeout 0` disables the request timeout (max `600000`). There is no madhhab ranking or multi-book fanout in the CLI.
 
 ## Known limitations
 
@@ -71,9 +87,9 @@ Browser support is not claimed because the checked API responses do not advertis
 
 ```bash
 bun install
+bun run build   # CLI bin loads dist/; also auto-built by CLI tests if missing
 bun test
 bun run typecheck
-bun run build
 
 # optional live contract (also scheduled via GitHub Actions)
 bun run test:live

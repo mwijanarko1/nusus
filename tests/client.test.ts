@@ -35,6 +35,8 @@ describe("Turath client", () => {
     expect(normalizedAuthor.name).toBe("النووي");
     expect(normalizedBook.title).toBe("الأربعون النووية مع زيادات ابن رجب");
     expect(normalizedBook.author?.id).toBe("44");
+    expect(normalizedBook.toc?.[0]).toMatchObject({ title: "تقديم مصطفى العدوي", level: 1, page: 2 });
+    expect(normalizedBook.volumes).toEqual(["1"]);
     expect(normalizedPage.headings).toContain("الحديث الأول: [الأعمال بالنيات]");
     expect(normalizedPage.citation).toBe("النووي، الأربعون النووية مع زيادات ابن رجب، ج 1، ص 5، صفحة تراث 5، تراث 147927");
     expect(normalizedPage.url).toBe("https://app.turath.io/book/147927?page=5");
@@ -45,6 +47,14 @@ describe("Turath client", () => {
       volume: "1",
       url: "https://app.turath.io/book/147927?page=5",
     });
+  });
+
+  test("findBooks lists books by author without a title query", () => {
+    calls.length = 0;
+    const books = client.findBooks("", { authorIds: [44], limit: 5 });
+    expect(books.length).toBeGreaterThan(0);
+    expect(books.every((book) => book.author?.id === "44")).toBe(true);
+    expect(calls).toHaveLength(0);
   });
 
   test("discovers books and categories from the bundled catalog without HTTP", () => {

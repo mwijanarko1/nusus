@@ -4,6 +4,7 @@ import { CATALOG_AUTHORS } from "./catalog-authors.js";
 import { CATALOG_BOOKS, CATALOG_CATEGORIES, CATALOG_SCANNED_AT } from "./catalog-data.js";
 
 export type FindBooksOptions = {
+  authorIds?: TurathId[];
   categoryIds?: TurathId[];
   limit?: number;
 };
@@ -66,20 +67,25 @@ export const getCatalogMetadata = (): CatalogMetadata => {
   };
 };
 
-export const findCatalogBooks = (query: string, options: FindBooksOptions = {}): Book[] => {
+export const findCatalogBooks = (query = "", options: FindBooksOptions = {}): Book[] => {
   const needle = normalize(query);
-  if (!needle) throw new NususError("INVALID_ARGUMENT", "query must not be empty");
-  const limit = positiveLimit(options.limit, 20);
+  const authors = options.authorIds?.map((value) => positiveId(value, "author id"));
   const categories = options.categoryIds?.map((value) => positiveId(value, "category id"));
+  const authorSet = authors?.length ? new Set(authors) : undefined;
   const categorySet = categories?.length ? new Set(categories) : undefined;
-  const words = needle.split(/\s+/);
+  if (!needle && !authorSet && !categorySet) {
+    throw new NususError("INVALID_ARGUMENT", "query must not be empty unless authorIds or categoryIds are set");
+  }
+  const limit = positiveLimit(options.limit, 20);
+  const words = needle ? needle.split(/\s+/) : [];
 
   return CATALOG_BOOKS
     .flatMap(([bookId, title, authorId, categoryId]) => {
-      if (categorySet && !categorySet.has(String(categoryId))) return [];
-      const score = scoreMatch(normalize(title), needle, words);
-      if (score < 0) return [];
       const authorKey = String(authorId);
+      if (authorSet && !authorSet.has(authorKey)) return [];
+      if (categorySet && !categorySet.has(String(categoryId))) return [];
+      const score = needle ? scoreMatch(normalize(title), needle, words) : 0;
+      if (score < 0) return [];
       const authorName = authorNames.get(authorKey);
       return [{
         score,

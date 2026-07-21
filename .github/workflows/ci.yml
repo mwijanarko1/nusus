@@ -15,6 +15,7 @@ jobs:
         with:
           bun-version: latest
       - run: bun install --frozen-lockfile
+      # CLI bin imports dist/; tests also self-build when dist is missing.
+      - run: bun run build
       - run: bun test
       - run: bun run typecheck
-      - run: bun run build

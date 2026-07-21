@@ -1,9 +1,30 @@
 import { NususError } from "../errors.js";
-import type { Author, Book, Passage } from "../models.js";
+import type { Author, Book, BookTocEntry, Passage } from "../models.js";
 import { decoratePassage } from "./citations.js";
 import type { RawAuthor, RawBook, RawPage, RawPageMeta, RawSearchHit } from "./raw-types.js";
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+const extractIndexes = (raw: Record<string, unknown>): { toc?: BookTocEntry[]; volumes?: string[] } => {
+  const indexes = raw.indexes;
+  if (!record(indexes)) return {};
+  const out: { toc?: BookTocEntry[]; volumes?: string[] } = {};
+  if (Array.isArray(indexes.headings)) {
+    const toc: BookTocEntry[] = [];
+    for (const item of indexes.headings) {
+      if (!record(item) || typeof item.title !== "string") continue;
+      const entry: BookTocEntry = { title: item.title };
+      if (typeof item.level === "number") entry.level = item.level;
+      if (typeof item.page === "number") entry.page = item.page;
+      toc.push(entry);
+    }
+    if (toc.length) out.toc = toc;
+  }
+  if (Array.isArray(indexes.volumes) && indexes.volumes.every((value) => typeof value === "string")) {
+    out.volumes = indexes.volumes as string[];
+  }
+  return out;
+};
 
 const invalid = (message: string, cause?: unknown): never => {
   throw new NususError("INVALID_RESPONSE", message, { cause });
@@ -43,6 +64,7 @@ export const normalizeBook = (raw: unknown): Book => {
     return invalid("Turath returned an invalid book");
   }
   const book = raw as RawBook;
+  const indexes = extractIndexes(raw);
   return {
     provider: "turath",
     id: String(book.meta.id),
@@ -51,6 +73,7 @@ export const normalizeBook = (raw: unknown): Book => {
     ...(typeof book.meta.cat_id === "number" && { category: { id: String(book.meta.cat_id) } }),
     ...(typeof book.meta.info === "string" && { description: book.meta.info }),
     ...(Boolean(book.meta.pdf_links) && { hasPdf: true }),
+    ...indexes,
     raw,
   };
 };

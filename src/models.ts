@@ -21,6 +21,12 @@ export type BookSummary = {
   title: string;
 };
 
+export type BookTocEntry = {
+  title: string;
+  level?: number;
+  page?: number;
+};
+
 export type Author = AuthorSummary & {
   provider: "turath";
   id: string;
@@ -35,6 +41,10 @@ export type Book = BookSummary & {
   category?: CategorySummary;
   description?: string;
   hasPdf?: boolean;
+  /** Normalized TOC from Turath book indexes when present. */
+  toc?: BookTocEntry[];
+  /** Volume labels from Turath book indexes when present. */
+  volumes?: string[];
   raw?: unknown;
 };
 
