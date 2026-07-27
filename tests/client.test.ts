@@ -209,6 +209,33 @@ describe("retrieve context and provenance", () => {
     expect(result.passages[0]?.provenance?.truncation).toBe("prefix");
   });
 
+  test("getContextByPage fetches each page once without a redundant center prefetch", async () => {
+    const pagesRequested: string[] = [];
+    const byPage = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          const pg = url.searchParams.get("pg") ?? "?";
+          pagesRequested.push(pg);
+          return Response.json({
+            meta: JSON.stringify({
+              headings: [`h${pg}`],
+              page_id: Number(pg),
+              page: Number(pg),
+              book_name: "كتاب",
+              author_name: "مؤلف",
+            }),
+            text: `نص الصفحة ${pg}`,
+          });
+        }
+        return Response.json({});
+      }) as typeof fetch,
+    });
+
+    await byPage.getContextByPage(3, 5, { pagesBefore: 1, pagesAfter: 1 });
+    expect(pagesRequested.sort()).toEqual(["4", "5", "6"]);
+  });
+
   test("includes adjacent pages only when requested", async () => {
     const pages: string[] = [];
     const adjacent = createTurathClient({
