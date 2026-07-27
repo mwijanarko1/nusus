@@ -68,8 +68,10 @@ nusus retrieve "النية" --max-passages 3 --max-chars 2000
 
 # Page / metadata (live)
 nusus get-page --book-id 147927 --page-id 5
+nusus get-pages --book-id 147927 --from 5 --to 7
 nusus get-context --book-id 147927 --page-id 5 --pages-before 1 --pages-after 1
 nusus get-book 147927
+nusus find-toc "الحديث الأول" --book-id 147927 --limit 10
 nusus get-author 44
 ```
 
@@ -77,9 +79,10 @@ Default stdout is **JSONL** (one object per line, camelCase, every line has `typ
 
 | Record `type` | Commands |
 | --- | --- |
-| `meta` | First line of `find-books`, `find-authors`, `search`, `retrieve` |
+| `meta` | First line of `find-books`, `find-authors`, `search`, `retrieve`, `get-pages`, `find-toc` |
 | `book` / `author` / `category` / `catalog` | Discovery + `get-book` / `get-author` |
-| `passage` | `search`, `retrieve`, `get-page`, `get-context` |
+| `passage` | `search`, `retrieve`, `get-page`, `get-pages`, `get-context` |
+| `toc-entry` | `find-toc` |
 
 | Exit | Meaning |
 | --- | --- |

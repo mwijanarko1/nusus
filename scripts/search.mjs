@@ -11,6 +11,7 @@ import { NususError } from "../dist/errors.js";
 const DEFAULT_TIMEOUT = 15_000;
 const MAX_TIMEOUT = 600_000;
 const MAX_FILTER_IDS = 50;
+const MAX_PAGE_SPAN = 20;
 const VERSION = createRequire(import.meta.url)(join(dirname(fileURLToPath(import.meta.url)), "../package.json")).version;
 
 const EXIT = {
@@ -92,6 +93,11 @@ const writeText = (record) => {
     case "passage":
       process.stdout.write(
         `passage\t${record.book?.id ?? "?"}\t${record.citation ?? ""}\t${record.url ?? ""}\t${preview(record.text)}\n`,
+      );
+      break;
+    case "toc-entry":
+      process.stdout.write(
+        `toc-entry\t${record.bookId ?? "?"}\t${record.page ?? ""}\t${record.level ?? ""}\t${record.title}\n`,
       );
       break;
     default:
@@ -518,6 +524,69 @@ const COMMANDS = {
       emit(format, toAuthorRecord(author));
     },
   },
+  "get-pages": {
+    help: `nusus get-pages --book-id <id> --from <n> --to <m>
+  Fetch a contiguous internal page range (max span ${MAX_PAGE_SPAN}).
+  Emits meta then one passage per page.
+  page numbers are Turath internal pages, not printed pages.`,
+    flags: [...GLOBAL_FLAGS, "book-id", "from", "to"],
+    run: async ({ turath, format, positionals, flags }) => {
+      if (positionals.length) usage("get-pages takes --book-id, --from, and --to flags only");
+      const bookId = parsePositiveId(requireFlag(flags, "book-id"), "book-id");
+      const from = parseIntFlag(flags.from, "from", { min: 1 });
+      const to = parseIntFlag(flags.to, "to", { min: from });
+      if (to - from + 1 > MAX_PAGE_SPAN) {
+        usage(`page span must be at most ${MAX_PAGE_SPAN} (got ${to - from + 1})`);
+      }
+      const pages = await turath.getPages(bookId, { from, to });
+      emit(format, {
+        type: "meta",
+        command: "get-pages",
+        bookId,
+        from,
+        to,
+        returned: pages.length,
+      });
+      for (const page of pages) emit(format, toPassageRecord(page));
+    },
+  },
+  "find-toc": {
+    help: `nusus find-toc <query> --book-id <id> [--limit N]
+  Filter a book's TOC headings by substring match on title (no stemming).
+  --limit          default 20, max 100`,
+    flags: [...GLOBAL_FLAGS, "book-id", "limit"],
+    run: async ({ turath, format, positionals, flags }) => {
+      const query = takeQuery(positionals);
+      const bookId = parsePositiveId(requireFlag(flags, "book-id"), "book-id");
+      const limit = parseIntFlag(flags.limit, "limit", { def: 20, min: 1, max: 100 });
+      const book = await turath.getBook(bookId);
+      const toc = book.toc ?? [];
+      const needle = String(query);
+      const matches = [];
+      for (const entry of toc) {
+        if (!entry.title.includes(needle)) continue;
+        matches.push(entry);
+        if (matches.length >= limit) break;
+      }
+      emit(format, {
+        type: "meta",
+        command: "find-toc",
+        query,
+        bookId,
+        limit,
+        returned: matches.length,
+      });
+      for (const entry of matches) {
+        emit(format, {
+          type: "toc-entry",
+          bookId,
+          title: entry.title,
+          ...(entry.level !== undefined && { level: entry.level }),
+          ...(entry.page !== undefined && { page: entry.page }),
+        });
+      }
+    },
+  },
 };
 
 const GLOBAL_HELP = `nusus <command> [args] [options]
@@ -530,8 +599,10 @@ Commands:
   search <query>           Live Turath search (JSONL meta + passages)
   retrieve <query>         Live retrieve with citations/locators
   get-page                 Fetch one internal page
+  get-pages                Fetch a contiguous internal page range
   get-context              Fetch page plus surrounding pages
   get-book <book-id>       Book metadata + TOC
+  find-toc <query>         Filter book TOC by title substring
   get-author <author-id>   Author metadata
 
 Global options:

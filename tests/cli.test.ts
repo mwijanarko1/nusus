@@ -134,8 +134,10 @@ describe("nusus CLI", () => {
       "search",
       "retrieve",
       "get-page",
+      "get-pages",
       "get-context",
       "get-book",
+      "find-toc",
       "get-author",
     ]) {
       expect(result.stdout).toContain(command);
@@ -414,7 +416,7 @@ describe("nusus CLI", () => {
     expect(record.volumes).toEqual(["1"]);
   });
 
-  test("get-page, get-context, and get-author succeed", async () => {
+  test("get-page, get-context, get-pages, find-toc, and get-author succeed", async () => {
     const pageResult = await run(["get-page", "--book-id", "147927", "--page-id", "5"]);
     expect(pageResult.code).toBe(0);
     expect(pageResult.lines[0]).toMatchObject({
@@ -442,6 +444,75 @@ describe("nusus CLI", () => {
     const authorResult = await run(["get-author", "44"]);
     expect(authorResult.code).toBe(0);
     expect(authorResult.lines[0]).toMatchObject({ type: "author", id: "44", name: "النووي" });
+
+    const pagesResult = await run([
+      "get-pages",
+      "--book-id",
+      "147927",
+      "--from",
+      "5",
+      "--to",
+      "7",
+    ]);
+    expect(pagesResult.code).toBe(0);
+    expect(pagesResult.lines[0]).toMatchObject({
+      type: "meta",
+      command: "get-pages",
+      bookId: "147927",
+      from: 5,
+      to: 7,
+      returned: 3,
+    });
+    expect(pagesResult.lines.slice(1).every((line) => line.type === "passage")).toBe(true);
+    expect(pagesResult.lines.length).toBe(4);
+
+    const tocResult = await run(["find-toc", "الحديث الأول", "--book-id", "147927", "--limit", "5"]);
+    expect(tocResult.code).toBe(0);
+    expect(tocResult.lines[0]).toMatchObject({
+      type: "meta",
+      command: "find-toc",
+      query: "الحديث الأول",
+      bookId: "147927",
+      limit: 5,
+      returned: expect.any(Number),
+    });
+    expect(tocResult.lines.some((line) => line.type === "toc-entry")).toBe(true);
+    const firstEntry = tocResult.lines.find((line) => line.type === "toc-entry") as {
+      type: string;
+      title: string;
+      bookId: string;
+      page?: number;
+      level?: number;
+    };
+    expect(firstEntry.title).toContain("الحديث الأول");
+    expect(firstEntry.bookId).toBe("147927");
+    expect(firstEntry.page).toBeGreaterThan(0);
+  });
+
+  test("get-pages rejects span over 20 with exit 1", async () => {
+    const result = await run(["get-pages", "--book-id", "147927", "--from", "1", "--to", "22"]);
+    expect(result.code).toBe(1);
+    expect(result.stdout).toBe("");
+    expect(stderrError(result.stderr).error.message).toMatch(/page span must be at most 20/);
+  });
+
+  test("find-toc requires --book-id and reports zero matches", async () => {
+    const missing = await run(["find-toc", "الحديث"]);
+    expect(missing.code).toBe(1);
+    expect(stderrError(missing.stderr).error.code).toBe("USAGE");
+
+    const miss = await run(["find-toc", "zzz-no-toc-match", "--book-id", "147927"]);
+    expect(miss.code).toBe(0);
+    expect(miss.lines).toEqual([
+      {
+        type: "meta",
+        command: "find-toc",
+        query: "zzz-no-toc-match",
+        bookId: "147927",
+        limit: 20,
+        returned: 0,
+      },
+    ]);
   });
 
   test("empty search still exits 0 with meta totalMatches", async () => {

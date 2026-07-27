@@ -30,8 +30,10 @@ nusus retrieve "النية في الصلاة" --max-passages 5 --max-chars 2000
 
 # Page / context / metadata (live)
 nusus get-page --book-id 147927 --page-id 5
+nusus get-pages --book-id 147927 --from 5 --to 7
 nusus get-context --book-id 147927 --page-id 5 --pages-before 1 --pages-after 1
 nusus get-book 147927
+nusus find-toc "الحديث الأول" --book-id 147927 --limit 10
 nusus get-author 44
 ```
 
@@ -44,7 +46,7 @@ node ~/Desktop/nusus/scripts/search.mjs --help
 
 Default stdout is JSONL (one object/line, camelCase, every line has `type`). Use `--format text` for compact human lines. Errors are JSON on stderr only. Unknown or command-inapplicable flags are rejected.
 
-Record types: `meta` (find-books/find-authors/search/retrieve first line), `passage`, `book` (optional normalized `toc`/`volumes`), `author`, `category`, `catalog`. Offline finders use `returned` (limit-sliced count); live `search`/`retrieve` use `totalMatches`.
+Record types: `meta` (find-books/find-authors/search/retrieve/get-pages/find-toc first line), `passage`, `toc-entry` (`find-toc`), `book` (optional normalized `toc`/`volumes`), `author`, `category`, `catalog`. Offline finders use `returned` (limit-sliced count); live `search`/`retrieve` use `totalMatches`.
 
 Exit codes: `0` success (including zero hits), `1` usage/invalid, `2` not found, `3` rate limit/HTTP/invalid response/timeout/internal.
 
@@ -122,7 +124,7 @@ Avoid issuing definitive fatwas. For personal religious practice, recommend a qu
 1. **Plan the search** — extract Arabic keywords, prefer Arabic terms, include variant spellings.
 2. **Discover scope** — `find-books` / `find-authors` / `list-categories`, then lock IDs.
 3. **Run Turath search** — `search` or `retrieve` with optional single-ID filters.
-4. **Retrieve primary context** — `get-page` / `get-context` / `get-book` TOC as needed.
+4. **Retrieve primary context** — `get-page` / `get-pages` / `get-context` / `find-toc` / `get-book` TOC as needed.
 5. **Assess relevance** — prefer direct mentions, primary sources, chapter headings, and stated legal context.
 6. **Synthesize cautiously** — quote Arabic when useful, explain uncertainty, never pretend consensus.
 
