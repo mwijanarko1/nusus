@@ -494,8 +494,7 @@ const COMMANDS = {
       const pageId = parsePositiveId(requireFlag(flags, "page-id"), "page-id");
       const pagesBefore = parseIntFlag(flags["pages-before"], "pages-before", { def: 1, min: 0, max: 3 });
       const pagesAfter = parseIntFlag(flags["pages-after"], "pages-after", { def: 1, min: 0, max: 3 });
-      const center = await turath.getPage(bookId, pageId);
-      const ctx = await turath.getContext(center, { pagesBefore, pagesAfter });
+      const ctx = await turath.getContextByPage(bookId, pageId, { pagesBefore, pagesAfter });
       emit(format, toPassageRecord(ctx));
     },
   },

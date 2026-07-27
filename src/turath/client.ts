@@ -69,6 +69,9 @@ const only = (values: TurathId[] | undefined, name: string): string | undefined 
 const emptyObject = (value: unknown): boolean =>
   typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 0;
 
+/** Parallel page fetches for multi-page context; bounded for large ranges. */
+const PAGE_FETCH_CONCURRENCY = 6;
+
 export const createTurathClient = (options: TurathClientOptions = {}) => {
   const request = createTransport(options);
 
@@ -92,6 +95,26 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     return normalizePage(raw, book);
   };
 
+  const fetchPagesConcurrent = async (
+    book: string,
+    pageNumbers: number[],
+    signal?: AbortSignal,
+  ): Promise<Passage[]> => {
+    if (!pageNumbers.length) return [];
+    const results: Passage[] = new Array(pageNumbers.length);
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < pageNumbers.length) {
+        const index = cursor;
+        cursor += 1;
+        results[index] = await getPage(book, pageNumbers[index]!, { signal });
+      }
+    };
+    const workers = Math.min(PAGE_FETCH_CONCURRENCY, pageNumbers.length);
+    await Promise.all(Array.from({ length: workers }, worker));
+    return results;
+  };
+
   const getPages = async (
     bookId: TurathId,
     range: { from: number; to: number },
@@ -99,12 +122,10 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
   ): Promise<Passage[]> => {
     integer(range.from, "from", 1);
     integer(range.to, "to", range.from);
-    // ponytail: sequential page fetches; add bounded concurrency if large ranges get slow (Phase 3)
-    const pages: Passage[] = [];
-    for (let page = range.from; page <= range.to; page += 1) {
-      pages.push(await getPage(bookId, page, { signal }));
-    }
-    return pages;
+    const book = id(bookId, "book id");
+    const pageNumbers: number[] = [];
+    for (let page = range.from; page <= range.to; page += 1) pageNumbers.push(page);
+    return fetchPagesConcurrent(book, pageNumbers, signal);
   };
 
   const search = async (query: string, options: TurathSearchOptions = {}): Promise<SearchPage> => {
@@ -150,20 +171,32 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     }
   };
 
-  const getContext = async (source: Passage, options: ContextOptions = {}): Promise<Passage> => {
-    const center = source.location.internalPage;
-    if (center === undefined) throw new NususError("INVALID_ARGUMENT", "passage has no internal page");
-    integer(center, "internal page", 1);
-    const before = integer(options.pagesBefore ?? 1, "pagesBefore");
-    const after = integer(options.pagesAfter ?? 1, "pagesAfter");
-    const pages: Passage[] = [];
-    for (let page = Math.max(1, center - before); page <= center + after; page += 1) {
-      try {
-        pages.push(await getPage(source.book.id, page, { signal: options.signal }));
-      } catch (error) {
-        if (!(error instanceof NususError) || error.code !== "NOT_FOUND" || page === center) throw error;
-      }
-    }
+  const fetchPageRange = async (
+    book: string,
+    from: number,
+    to: number,
+    center: number,
+    signal?: AbortSignal,
+  ): Promise<Passage[]> => {
+    const pageNumbers: number[] = [];
+    for (let page = from; page <= to; page += 1) pageNumbers.push(page);
+    const fetched = await Promise.all(
+      pageNumbers.map(async (page) => {
+        try {
+          return { page, passage: await getPage(book, page, { signal }) };
+        } catch (error) {
+          if (!(error instanceof NususError) || error.code !== "NOT_FOUND" || page === center) throw error;
+          return undefined;
+        }
+      }),
+    );
+    return fetched
+      .filter((entry): entry is { page: number; passage: Passage } => entry !== undefined)
+      .sort((a, b) => a.page - b.page)
+      .map((entry) => entry.passage);
+  };
+
+  const buildContextPassage = (source: Passage, pages: Passage[]): Passage => {
     const headings = [...new Set(pages.flatMap((page) => page.headings))];
     return decoratePassage({
       ...source,
@@ -171,6 +204,37 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
       headings,
       raw: pages.map((page) => page.raw),
     });
+  };
+
+  const getContext = async (source: Passage, options: ContextOptions = {}): Promise<Passage> => {
+    const center = source.location.internalPage;
+    if (center === undefined) throw new NususError("INVALID_ARGUMENT", "passage has no internal page");
+    integer(center, "internal page", 1);
+    const before = integer(options.pagesBefore ?? 1, "pagesBefore");
+    const after = integer(options.pagesAfter ?? 1, "pagesAfter");
+    const pages = await fetchPageRange(
+      source.book.id,
+      Math.max(1, center - before),
+      center + after,
+      center,
+      options.signal,
+    );
+    return buildContextPassage(source, pages);
+  };
+
+  const getContextByPage = async (
+    bookId: TurathId,
+    pageId: TurathId,
+    options: ContextOptions = {},
+  ): Promise<Passage> => {
+    const book = id(bookId, "book id");
+    const center = integer(Number(id(pageId, "page id")), "page id", 1);
+    const before = integer(options.pagesBefore ?? 1, "pagesBefore");
+    const after = integer(options.pagesAfter ?? 1, "pagesAfter");
+    const pages = await fetchPageRange(book, Math.max(1, center - before), center + after, center, options.signal);
+    const centerPage = pages.find((page) => page.location.internalPage === center);
+    if (!centerPage) throw new NususError("NOT_FOUND", `Book ${book}, page ${center} not found`);
+    return buildContextPassage(centerPage, pages);
   };
 
   const retrieve = async (query: string, options: RetrieveOptions = {}): Promise<RetrievedContext> => {
@@ -227,6 +291,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     search,
     searchAll,
     getContext,
+    getContextByPage,
     retrieve,
     formatCitation: (source: CitationSource) => formatCitation(source),
     getLocator: (source: CitationSource) => getLocator(source),
