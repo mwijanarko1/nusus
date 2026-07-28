@@ -20,9 +20,9 @@ Install Node first, then run the commands above.
 
 | OS | Easiest path |
 | --- | --- |
-| **Windows** | Install **[Node.js LTS](https://nodejs.org/)** (the `.msi` installer). Or in PowerShell (Windows 10+): `winget install OpenJS.NodeJS.LTS` |
-| **macOS** | Install **[Node.js LTS](https://nodejs.org/)** (the `.pkg` installer). Homebrew is optional: `brew install node` |
-| **Linux** | Install **[Node.js LTS](https://nodejs.org/)** from the Node site, or your distro (`apt`/`dnf`/etc.). |
+| **Windows** | Install **[Node.js](https://nodejs.org/en/download/current)** (the `.msi` installer). Or in PowerShell (Windows 10+): `winget install OpenJS.NodeJS.LTS` |
+| **macOS** | Install **[Node.js](https://nodejs.org/en/download/current)** (the `.pkg` installer). Homebrew is optional: `brew install node` |
+| **Linux** | Install **[Node.js](https://nodejs.org/en/download/current)** from the Node site, or your distro (`apt`/`dnf`/etc.). |
 
 You do **not** need Homebrew, Bun, Claude Desktop, or a local Shamela library. After Node is installed, open a **new** terminal and check:
 
@@ -41,7 +41,7 @@ Set up Nusus for classical Islamic text research via Turath.
 Package: https://www.npmjs.com/package/nusus
 Repo: https://github.com/mwijanarko1/nusus
 
-1. If `node -v` is missing or older than v20, install Node.js LTS from https://nodejs.org/ (Windows: .msi or `winget install OpenJS.NodeJS.LTS`; macOS: .pkg or `brew install node`; Linux: Node LTS from nodejs.org or the distro package manager). Open a new shell after install.
+1. If `node -v` is missing or older than v20, install Node.js from https://nodejs.org/en/download/current (Windows: .msi or `winget install OpenJS.NodeJS.LTS`; macOS: .pkg or `brew install node`; Linux: Node from that page or the distro package manager). Open a new shell after install.
 2. Install the CLI: `npm install -g nusus` (or use `npx nusus …` without a global install).
 3. Research with the CLI (prefer these tools):
    - nusus find-books "<title>" / nusus find-authors "<name>"
