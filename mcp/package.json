@@ -1,0 +1,51 @@
+{
+  "name": "nusus-mcp",
+  "version": "0.1.0",
+  "description": "Local MCP stdio server for Nusus and Turath",
+  "keywords": [
+    "turath",
+    "shamela",
+    "maktaba-shamela",
+    "islamic-texts",
+    "arabic-books",
+    "hadith",
+    "fiqh",
+    "typescript",
+    "sdk",
+    "cli",
+    "jsonl",
+    "mcp",
+    "model-context-protocol",
+    "agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mwijanarko1/nusus.git",
+    "directory": "mcp"
+  },
+  "homepage": "https://github.com/mwijanarko1/nusus#readme",
+  "bugs": "https://github.com/mwijanarko1/nusus/issues",
+  "type": "module",
+  "bin": {
+    "nusus-mcp": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepack": "npm run build",
+    "test": "bun run build && bun test tests",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "nusus": "^0.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT"
+}

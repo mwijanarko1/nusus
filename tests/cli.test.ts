@@ -398,7 +398,7 @@ describe("nusus CLI", () => {
       // Keep the rebuilt dist for later tests; drop the backup snapshot.
       rmSync(backup, { recursive: true, force: true });
     }
-  });
+  }, 60_000);
 
   test("get-book includes toc from SDK-normalized indexes", async () => {
     const result = await run(["get-book", "147927"]);

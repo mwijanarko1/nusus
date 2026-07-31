@@ -1,6 +1,6 @@
 {
   "name": "nusus",
-  "version": "0.4.1",
+  "version": "0.6.0",
   "description": "TypeScript SDK and agent CLI for searching and citing classical Islamic and Arabic texts via Turath",
   "keywords": [
     "turath",
@@ -22,6 +22,9 @@
   "homepage": "https://github.com/mwijanarko1/nusus#readme",
   "bugs": "https://github.com/mwijanarko1/nusus/issues",
   "type": "module",
+  "workspaces": [
+    "mcp"
+  ],
   "files": [
     "dist",
     "scripts/search.mjs",
@@ -51,7 +54,7 @@
     "catalog:books": "bun scripts/refresh-catalog.mjs books"
   },
   "devDependencies": {
-    "typescript": "^5.8.3"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=20"

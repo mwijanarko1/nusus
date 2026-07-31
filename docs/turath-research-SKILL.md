@@ -1,13 +1,15 @@
 ---
 name: turath-research
-description: "Search and cite Islamic and Arabic heritage texts with nusus."
+description: "Search and cite Islamic and Arabic heritage texts with nusus (CLI, SDK, or nusus-mcp MCP tools)."
 ---
 
 # Turath Research
 
 Use this skill when the user asks an Islamic, Arabic heritage, fiqh, tafsir, hadith, biography, book, citation, or classical-source research question and wants sourced retrieval from Turath.
 
-Primary library: [`nusus`](https://github.com/mwijanarko1/nusus) — TypeScript **SDK + agent CLI** for citable context from classical Islamic texts via `https://api.turath.io/`. Requires Node.js `>=20`. Same package version for both surfaces.
+Primary library: [`nusus`](https://github.com/mwijanarko1/nusus) — TypeScript **SDK + agent CLI** for citable context from classical Islamic texts via `https://api.turath.io/`. Requires Node.js `>=20`. The optional separate `nusus-mcp` package exposes the same retrieval as MCP tools.
+
+**Interface selection:** if `nusus` MCP tools (`find_books`, `retrieve`, …) are already available in your tool list, use them directly. Otherwise, with shell access, use the CLI. Use the SDK only when writing application code. All three return the same citations; every gotcha, pitfall, and workflow rule in this skill applies to all of them.
 
 ## Agent CLI
 
@@ -80,6 +82,26 @@ const author = await turath.getAuthor(44);
 ```
 
 All methods accept `AbortSignal`; failures throw typed `NususError` (`NOT_FOUND`, `RATE_LIMITED`, `INVALID_RESPONSE`, `ABORTED`, …) — never string-match error messages.
+
+## MCP Tools (`nusus-mcp`)
+
+When the `nusus-mcp` server is configured in the host (config: command `npx`, args `["-y", "nusus-mcp"]`), these five tools appear natively — call them instead of the CLI:
+
+| Tool | Required args | Optional args | Maps to |
+| --- | --- | --- | --- |
+| `find_books` | `query` (may be `""` with a filter) | `authorId`, `categoryId`, `limit` | offline `findBooks()` |
+| `find_authors` | `query` | `limit` | offline `findAuthors()` |
+| `retrieve` | `query` | `bookId`, `authorId`, `categoryId`, `maxPassages`, `maxCharsPerPassage`, `pagesBefore`, `pagesAfter` | live `retrieve()` |
+| `get_context` | `bookId`, `pageId` | `pagesBefore`, `pagesAfter` | live `getContextByPage()` |
+| `get_book` | `bookId` | — | live `getBook()` (metadata + TOC) |
+
+Notes:
+
+- All IDs are integers (not strings); each filter accepts at most ONE ID, same upstream limit as CLI/SDK.
+- `pageId` is Turath's INTERNAL page, not the printed page — same as everywhere in nusus.
+- Results are JSON text content mirroring the SDK return values (passages with `citation`, `locator`, `url`, `provenance`).
+- Errors return `isError` with `{ code, message }` using `NususError` codes — check `code`, don't string-match.
+- There are no MCP equivalents of `list-categories`, `get-page`/`get-pages`, `find-toc`, or `get-author`; use `get_book` for TOC/headings, `get_context` for pages, or fall back to the CLI for the rest.
 
 ## API Gotchas
 

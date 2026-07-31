@@ -1,8 +1,19 @@
 # Nusus
 
-TypeScript SDK **and agent CLI** for searching and citing classical Islamic and Arabic texts through [Turath](https://app.turath.io/), a Shamela-style digital library. Use Nusus to retrieve source text, metadata, citations, locators, and direct links from Arabic heritage books for research tools and AI agents. The `nusus` binary ships in the same npm package as the SDK.
+TypeScript SDK, **agent CLI, and local MCP server** for searching and citing classical Islamic and Arabic texts through [Turath](https://app.turath.io/), a Shamela-style digital library. Use Nusus to retrieve source text, metadata, citations, locators, and direct links from Arabic heritage books for research tools and AI agents. The `nusus` binary ships with the SDK; the optional MCP server ships as [`nusus-mcp`](https://www.npmjs.com/package/nusus-mcp).
 
 **Links:** [npm](https://www.npmjs.com/package/nusus) · [GitHub](https://github.com/mwijanarko1/nusus)
+
+## Which interface do I need?
+
+All three wrap the same retrieval core and return the same citations. Pick by how you (or your agent) work:
+
+| You are… | Use | Setup |
+| --- | --- | --- |
+| Chatting in an MCP app (Claude Desktop, Cursor, …) | **MCP server** (`nusus-mcp`) | Paste a 6-line config → [Local MCP server](#local-mcp-server) |
+| Using a coding agent with a terminal (pi, Claude Code, Codex, …) | **CLI** (`nusus`) | `npm install -g nusus` → [Set up an AI agent](#set-up-an-ai-agent) |
+| In a terminal yourself | **CLI** (`nusus`) | `npm install -g nusus` → [Quick start](#quick-start-humans-or-ai-agents) |
+| Writing TypeScript/JavaScript code | **SDK** (`nusus`) | `npm install nusus` → [SDK](#sdk) |
 
 ## Quick start (humans or AI agents)
 
@@ -31,9 +42,13 @@ node -v   # v20 or newer
 npm -v
 ```
 
-### Paste this to an AI agent
+## Set up an AI agent
 
-Give your agent the npm or GitHub link and this prompt:
+Nusus works with AI agents three ways. Use whichever matches your agent — they expose the same tools and citations.
+
+### 1. Coding agents with a terminal (pi, Claude Code, Codex, Cursor agents, …)
+
+These agents can run shell commands, so the CLI needs zero configuration. Give your agent the npm or GitHub link and this prompt:
 
 ```
 Set up Nusus for classical Islamic text research via Turath.
@@ -52,6 +67,16 @@ Repo: https://github.com/mwijanarko1/nusus
 
 Topic: [YOUR QUESTION]
 ```
+
+For a reusable version of these instructions, install [`docs/turath-research-SKILL.md`](docs/turath-research-SKILL.md) as an agent skill.
+
+### 2. MCP apps (Claude Desktop, Cursor, and other MCP clients)
+
+If your agent lives in an app that supports the [Model Context Protocol](https://modelcontextprotocol.io/), add the [`nusus-mcp`](https://www.npmjs.com/package/nusus-mcp) server instead — no terminal use by the agent, tools appear natively. Config and details: [Local MCP server](#local-mcp-server).
+
+### 3. Agents you are building in code
+
+Call the [SDK](#sdk) directly — `retrieve()` returns bounded, citation-carrying passages designed to drop into a prompt, and you can wire it up as a custom tool in any agent framework.
 
 ## SDK
 
@@ -141,6 +166,50 @@ Default stdout is **JSONL** (one object per line, camelCase, every line has `typ
 `page-id` is Turath’s internal page (`location.internalPage`), not the printed page. `search`/`retrieve` accept at most one `--book-id`, one `--author-id`, and one `--category-id` (filters may be combined). Offline `find-books` accepts repeated `--author-id`/`--category-id` and may omit the title query when those filters are set. `--timeout 0` disables the request timeout (max `600000`). There is no madhhab ranking or multi-book fanout in the CLI.
 
 Repo layout and module boundaries: [`docs/CODEBASE_MAP.md`](docs/CODEBASE_MAP.md). Agent skill copy: [`docs/turath-research-SKILL.md`](docs/turath-research-SKILL.md).
+
+## Local MCP server
+
+[`nusus-mcp`](https://www.npmjs.com/package/nusus-mcp) is an optional stdio server for MCP clients. It exposes five tools: `find_books`, `find_authors`, `retrieve`, `get_context`, and `get_book`. Requires Node.js 20+ (see [Quick start](#quick-start-humans-or-ai-agents)); nothing else to install — `npx` fetches the package on first launch.
+
+**Claude Desktop:** add this to `claude_desktop_config.json` (Settings → Developer → Edit Config) and restart the app:
+
+```json
+{
+  "mcpServers": {
+    "nusus": {
+      "command": "npx",
+      "args": ["-y", "nusus-mcp"]
+    }
+  }
+}
+```
+
+**Other MCP clients** (Cursor, VS Code, etc.): register the same stdio server — command `npx`, args `["-y", "nusus-mcp"]` — using that client's MCP settings.
+
+### Paste this to an AI agent to install it for you
+
+If you have any coding agent with shell access (pi, Claude Code, Codex, Cursor, …), paste this and it will configure the MCP server in your apps:
+
+```
+Install the nusus-mcp MCP server (classical Islamic text research via Turath) into my MCP client apps.
+
+Package: https://www.npmjs.com/package/nusus-mcp (local stdio server, no API key)
+
+1. Verify Node.js 20+: `node -v`. If missing/old, install from https://nodejs.org/en/download/current, then open a new shell.
+2. Server command for every client: command `npx`, args ["-y", "nusus-mcp"]. If the app launches with a limited PATH, use the absolute npx path from `which npx` / `where.exe npx` instead.
+3. Detect which of these apps I have and configure each one (create the file/entry if absent, MERGE into existing JSON — never overwrite other servers):
+   - Claude Desktop: add to "mcpServers" in claude_desktop_config.json (macOS: ~/Library/Application Support/Claude/; Windows: %APPDATA%\Claude\; Linux: ~/.config/Claude/).
+   - Claude Code: run `claude mcp add nusus -- npx -y nusus-mcp`.
+   - Cursor: add to "mcpServers" in ~/.cursor/mcp.json (or .cursor/mcp.json in a project).
+   - VS Code: add to "servers" in the user mcp.json via the "MCP: Open User Configuration" command, type "stdio".
+   - Codex CLI: add to ~/.codex/config.toml: [mcp_servers.nusus] command = "npx" args = ["-y", "nusus-mcp"].
+   - ChatGPT: skip — it only supports remote MCP connectors, not local stdio servers.
+4. Verify: `npx -y nusus-mcp` should start and wait on stdin (Ctrl+C to exit). Tell me which apps you configured and that I must restart them.
+
+Do not add API keys or env vars; none are needed. Optional: NUSUS_TURATH_BASE_URL overrides the Turath API base URL for testing.
+```
+
+If the app cannot find `npx` because it starts with a limited `PATH`, use the absolute path from `which npx` (macOS/Linux) or `where.exe npx` (Windows). See [`mcp/README.md`](mcp/README.md) for tool arguments and development instructions.
 
 ## Known limitations
 

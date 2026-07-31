@@ -2,9 +2,9 @@
 
 ## 1. Vision
 
-Build a dependable TypeScript SDK **and agent CLI** that give AI agents and applications sourced context from classical Islamic and Arabic heritage texts.
+Build a dependable TypeScript SDK, **agent CLI, and local MCP server** that give AI agents and applications sourced context from classical Islamic and Arabic heritage texts.
 
-The primary consumer is an agent (tool call, MCP server, RAG pipeline) that needs citable passages within a bounded token budget. Human-facing research apps are supported by the same API. As of `0.4.0`, the package ships a JSONL-first `nusus` CLI (`scripts/search.mjs`) alongside the SDK — see `README.md` and `docs/CODEBASE_MAP.md`.
+The primary consumer is an agent (tool call, MCP server, RAG pipeline) that needs citable passages within a bounded token budget. Human-facing research apps are supported by the same API. The JSONL-first `nusus` CLI (`scripts/search.mjs`) has shipped alongside the SDK since `0.4.0`; the separate `nusus-mcp` package now provides a local stdio MCP surface — see `README.md` and `docs/CODEBASE_MAP.md`.
 
 The first release will target Turath. Shamela support may be added later through a separate provider because Turath and Shamela have different APIs, identifiers, metadata, and search behavior.
 
@@ -110,7 +110,7 @@ Rules:
 - no metadata is invented; missing fields stay absent;
 - source text is never rewritten — normalization applies to the query only.
 
-An MCP server is a thin wrapper over this method and is planned as a separate package once the SDK core is stable (Phase 2+). It is a consumer of Nusus, not part of it.
+The MCP server ships as the separate `nusus-mcp` package. It is a thin, stdio-only consumer of the SDK and exposes five tools: `find_books`, `find_authors`, `retrieve`, `get_context`, and `get_book`.
 
 ## 6. Architecture
 

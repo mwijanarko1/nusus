@@ -2,7 +2,7 @@
 
 Checked 2026-07-15 against `api.turath.io`, using API version `3`.
 
-These endpoints back the SDK client and the `nusus` agent CLI (`search`, `retrieve`, `get-page`, `get-book`, `get-author`). Offline CLI discovery (`find-books`, `find-authors`, `list-categories`, `catalog`) uses the bundled snapshot, not a live catalog API.
+These endpoints back the SDK client, the `nusus` agent CLI (`search`, `retrieve`, `get-page`, `get-book`, `get-author`), and the live `nusus-mcp` tools (`retrieve`, `get_context`, `get_book`). Offline CLI discovery (`find-books`, `find-authors`, `list-categories`, `catalog`) and MCP discovery (`find_books`, `find_authors`) use the bundled snapshot, not a live catalog API.
 
 | Endpoint | Purpose | Parameters | Pagination | Fixture | Failure behavior |
 | --- | --- | --- | --- | --- | --- |
