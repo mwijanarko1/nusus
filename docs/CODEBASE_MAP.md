@@ -6,7 +6,7 @@ last_mapped: 2026-07-31T00:00:00Z
 
 ## System Overview
 
-Nusus is a Bun workspace with two npm packages and three public surfaces:
+Nusus is a repository with two independently installed npm packages and three public surfaces:
 
 1. **SDK** — `nusus` and `nusus/turath` TypeScript exports for Turath retrieval.
 2. **Agent CLI** — `nusus` bin → `scripts/search.mjs`, JSONL-first wrappers over the SDK.
@@ -35,7 +35,7 @@ src/transport.ts         fetch, timeout, status → NususError
 
 | Path | Role |
 | --- | --- |
-| `package.json` | Root `nusus` package, workspace, SDK exports, and CLI bin |
+| `package.json` | Root `nusus` package, SDK exports, and CLI bin |
 | `src/index.ts` | Root package exports: errors + public model types |
 | `src/models.ts` | Shared domain types (`Book`, `Passage`, `BookTocEntry`, …) |
 | `src/errors.ts` | `NususError` + codes |
@@ -91,13 +91,13 @@ The CLI and MCP server use the same retrieval rules; citations and locators come
 
 ### Build / test / package
 
-- `bun install` installs the workspace, but Bun resolves `mcp`'s `nusus` dependency from npm because the SDK package is the workspace root. During a version bump, publish the root package before expecting a fresh install to resolve it.
+- Root and `mcp/` are independent packages: run `bun install` in each directory. During a version bump, publish root `nusus` before installing or publishing `nusus-mcp`, whose dependency resolves from npm.
 - `bun run build` → root `dist/`; `(cd mcp && bun run build)` → `mcp/dist/`.
 - `bun test` runs the root suite; `(cd mcp && bun run test)` builds and runs the MCP suite.
 - Both packages run their own build in `prepack`.
 - Root package `files`: `dist`, `scripts/search.mjs`, `README.md`, `LICENSE`; it does not publish `mcp/`.
 - MCP package `files`: `dist`, `README.md`, `LICENSE`.
-- Publish explicitly in dependency order: root `nusus` first, then `mcp/`; do not use an unordered bulk workspace publish.
+- Publish explicitly in dependency order: root `nusus` first, then `mcp/`.
 - CLI tests call `ensureDist()` so clean checkouts work before a manual build; CI builds before tests.
 
 ### Catalog refresh

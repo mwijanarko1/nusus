@@ -35,14 +35,14 @@ Each live search filter accepts at most one ID. `pageId` is Turath's internal pa
 
 ## Development
 
-`nusus-mcp` declares the publishable dependency `"nusus": "^0.6.0"`. Because the SDK package is the workspace root rather than a child workspace, Bun resolves that dependency from npm instead of linking the local root. Until `nusus@0.6.0` is published, keep the existing install for local verification; after publishing it, run:
+`nusus-mcp` declares the publishable dependency `"nusus": "^0.6.0"` and is installed independently from the root package. Publish `nusus@0.6.0` before installing or publishing `nusus-mcp@0.1.0` so npm can resolve the SDK dependency. Then run:
 
 ```bash
+cd mcp
 bun install
 bun run build
-(cd mcp && bun run build && bun run typecheck && bun run test)
+bun run typecheck
+bun run test
 ```
-
-Publish `nusus@0.6.0` before publishing `nusus-mcp@0.1.0` so fresh installs can resolve the SDK dependency.
 
 `NUSUS_TURATH_BASE_URL` overrides the Turath API base URL, primarily for fixture-backed tests.

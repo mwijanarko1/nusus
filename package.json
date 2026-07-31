@@ -22,9 +22,6 @@
   "homepage": "https://github.com/mwijanarko1/nusus#readme",
   "bugs": "https://github.com/mwijanarko1/nusus/issues",
   "type": "module",
-  "workspaces": [
-    "mcp"
-  ],
   "files": [
     "dist",
     "scripts/search.mjs",
@@ -48,7 +45,7 @@
     "build": "tsc -p tsconfig.json",
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "bun test",
+    "test": "bun test ./tests",
     "test:live": "NUSUS_LIVE=1 bun test ./tests/live.test.ts",
     "catalog:authors": "bun scripts/refresh-catalog.mjs authors",
     "catalog:books": "bun scripts/refresh-catalog.mjs books"
