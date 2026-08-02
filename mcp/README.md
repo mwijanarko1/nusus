@@ -35,7 +35,7 @@ Each live search filter accepts at most one ID. `pageId` is Turath's internal pa
 
 ## Development
 
-`nusus-mcp` declares the publishable dependency `"nusus": "^0.6.0"` and is installed independently from the root package. Publish `nusus@0.6.0` before installing or publishing `nusus-mcp@0.1.0` so npm can resolve the SDK dependency. Then run:
+`nusus-mcp` declares the publishable dependency `"nusus": "^0.6.1"` and is installed independently from the root package. Publish `nusus@0.6.1` before installing or publishing `nusus-mcp@0.1.1` so npm can resolve the SDK dependency. Then run:
 
 ```bash
 cd mcp

@@ -51,6 +51,13 @@ describe("Turath client", () => {
     });
   });
 
+  test("removes HTML tags without deleting literal angle-bracket text", async () => {
+    const literal = createTurathClient({
+      fetch: (async () => Response.json({ ...page, text: "<span>نص</span> <تصحيح>" })) as typeof fetch,
+    });
+    expect((await literal.getPage(147927, 5)).text).toBe("نص <تصحيح>");
+  });
+
   test("findBooks lists books by author without a title query", () => {
     calls.length = 0;
     const books = client.findBooks("", { authorIds: [44], limit: 5 });
@@ -116,6 +123,25 @@ describe("Turath client", () => {
     expect(result.passages[0]?.provenance?.effectiveQuery).toBe("الحمد لله رب العالمين");
   });
 
+  test("reuses the normalized query while paginating searchAll", async () => {
+    const requests: string[] = [];
+    const fallback = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        const query = url.searchParams.get("q") ?? "";
+        const pageNumber = url.searchParams.get("page") ?? "1";
+        requests.push(`${query}:${pageNumber}`);
+        if (query !== "الحمد لله") return Response.json({ count: 0, data: [] });
+        return Response.json({ count: 2, data: [search.data[0]] });
+      }) as typeof fetch,
+    });
+
+    const items = [];
+    for await (const item of fallback.searchAll("ٱلْحَمْدُ لِلَّهِ")) items.push(item);
+    expect(items).toHaveLength(2);
+    expect(requests).toEqual(["ٱلْحَمْدُ لِلَّهِ:1", "الحمد لله:1", "الحمد لله:2"]);
+  });
+
   test("normalizes combining hamza, whitespace, and alternate hamza seats on fallback", async () => {
     const querySets: string[][] = [];
     for (const [query, accepted] of [
@@ -140,6 +166,16 @@ describe("Turath client", () => {
       ["الحمد ", "الحمد"],
       ["مسئول", "مسءول", "مسؤول"],
     ]);
+
+    const exactSpelling: string[] = [];
+    const noTaaMarbutaFallback = createTurathClient({
+      fetch: (async (input) => {
+        exactSpelling.push(new URL(String(input)).searchParams.get("q") ?? "");
+        return Response.json({ count: 0, data: [] });
+      }) as typeof fetch,
+    });
+    await noTaaMarbutaFallback.search("رحمة");
+    expect(exactSpelling).toEqual(["رحمة"]);
   });
 
   test("paginates retrieve beyond the upstream page size", async () => {

@@ -66,7 +66,6 @@ const searchFallbacks = (query: string): string[] => {
     .replace(/\p{M}/gu, "")
     .replace(/[إآٱ]/g, "ا")
     .replace(/ى/g, "ي")
-    .replace(/ة/g, "ه")
     .replace(/ـ/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -196,8 +195,10 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
   const searchAll = async function* (query: string, options: Omit<TurathSearchOptions, "page"> = {}): AsyncGenerator<Passage> {
     let page = 1;
     let yielded = 0;
+    let effectiveQuery = query;
     while (true) {
-      const result = await search(query, { ...options, page });
+      const result = await search(effectiveQuery, { ...options, page });
+      effectiveQuery = result.effectiveQuery ?? effectiveQuery;
       if (!result.items.length) return;
       for (const item of result.items) {
         yield item;
@@ -329,9 +330,9 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
         delete publicPage.raw;
         const bounded = decoratePassage({
           ...publicPage,
-          ...(hit.author || page.author ? { author: { ...hit.author, ...page.author } } : {}),
+          ...(hit.author || page.author ? { author: { ...page.author, ...hit.author } } : {}),
           ...(hit.category
-            ? { category: { ...hit.category, ...page.category } }
+            ? { category: { ...page.category, ...hit.category } }
             : page.category ? { category: page.category } : {}),
           snippet: hit.snippet,
           text: bound.text,

@@ -1,6 +1,6 @@
 {
   "name": "nusus",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "description": "TypeScript SDK and agent CLI for searching and citing classical Islamic and Arabic texts via Turath",
   "keywords": [
     "turath",

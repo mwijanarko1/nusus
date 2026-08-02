@@ -5,7 +5,7 @@ import type { RawAuthor, RawBook, RawPage, RawPageMeta, RawSearchHit } from "./r
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-const plainText = (value: string): string => value.replace(/<br\s*\/?\s*>/gi, "\n").replace(/<[^>]*>/g, "");
+const plainText = (value: string): string => value.replace(/<br\s*\/?\s*>/gi, "\n").replace(/<\/?[a-z][^>]*>/gi, "");
 
 const extractIndexes = (raw: Record<string, unknown>): { toc?: BookTocEntry[]; volumes?: string[] } => {
   const indexes = raw.indexes;
