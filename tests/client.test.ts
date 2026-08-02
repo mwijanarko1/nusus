@@ -38,6 +38,8 @@ describe("Turath client", () => {
     expect(normalizedBook.toc?.[0]).toMatchObject({ title: "تقديم مصطفى العدوي", level: 1, page: 2 });
     expect(normalizedBook.volumes).toEqual(["1"]);
     expect(normalizedPage.headings).toContain("الحديث الأول: [الأعمال بالنيات]");
+    expect(normalizedPage.text).not.toContain("<span");
+    expect(normalizedPage.text).toStartWith("الحديث الأول: [الأعمال بالنيات]");
     expect(normalizedPage.citation).toBe("النووي، الأربعون النووية مع زيادات ابن رجب، ج 1، ص 5، صفحة تراث 5، تراث 147927");
     expect(normalizedPage.url).toBe("https://app.turath.io/book/147927?page=5");
     expect(normalizedPage.locator).toEqual({
@@ -89,7 +91,55 @@ describe("Turath client", () => {
     expect(result.passages).toHaveLength(2);
     expect(result.passages.every((item) => item.text.length <= 80)).toBe(true);
     expect(result.passages.every((item) => item.citation && item.url)).toBe(true);
+    expect(result.passages.every((item) => !Object.hasOwn(item, "raw"))).toBe(true);
+    expect(result.passages[0]?.author?.id).toBe("44");
+    expect(result.passages[0]?.category?.id).toBe("6");
     expect(result.totalMatches).toBe(search.count);
+  });
+
+  test("falls back to a normalized Arabic query only after an exact miss", async () => {
+    const queries: string[] = [];
+    const fallback = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) return Response.json(page);
+        const query = url.searchParams.get("q") ?? "";
+        queries.push(query);
+        return Response.json(query === "الحمد لله رب العالمين" ? { count: 1, data: [search.data[0]] } : { count: 0, data: [] });
+      }) as typeof fetch,
+    });
+
+    const query = "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ";
+    const result = await fallback.retrieve(query, { maxPassages: 1 });
+    expect(queries).toEqual([query, "الحمد لله رب العالمين"]);
+    expect(result.effectiveQuery).toBe("الحمد لله رب العالمين");
+    expect(result.passages[0]?.provenance?.effectiveQuery).toBe("الحمد لله رب العالمين");
+  });
+
+  test("normalizes combining hamza, whitespace, and alternate hamza seats on fallback", async () => {
+    const querySets: string[][] = [];
+    for (const [query, accepted] of [
+      ["مؤمن", "مؤمن"],
+      ["الحمد ", "الحمد"],
+      ["مسئول", "مسؤول"],
+    ]) {
+      const queries: string[] = [];
+      const fallback = createTurathClient({
+        fetch: (async (input) => {
+          const value = new URL(String(input)).searchParams.get("q") ?? "";
+          queries.push(value);
+          return Response.json(value === accepted ? { count: 1, data: [search.data[0]] } : { count: 0, data: [] });
+        }) as typeof fetch,
+      });
+      const result = await fallback.search(query);
+      expect(result.effectiveQuery).toBe(accepted);
+      querySets.push(queries);
+    }
+    expect(querySets).toEqual([
+      ["مؤمن", "مؤمن"],
+      ["الحمد ", "الحمد"],
+      ["مسئول", "مسءول", "مسؤول"],
+    ]);
   });
 
   test("paginates retrieve beyond the upstream page size", async () => {
@@ -283,6 +333,11 @@ describe("retrieve context and provenance", () => {
     expect(wide.passages[0]?.text).toContain("نص الصفحة 5");
     expect(wide.passages[0]?.text).toContain("نص الصفحة 6");
     expect(wide.passages[0]?.provenance?.contextPages).toEqual({ before: 1, after: 1 });
+    expect(wide.passages[0]?.segments).toHaveLength(3);
+    for (const segment of wide.passages[0]?.segments ?? []) {
+      expect(wide.passages[0]?.text.slice(segment.start, segment.end)).toBe(`نص الصفحة ${segment.location.internalPage}`);
+      expect(segment.citation).toContain(`صفحة تراث ${segment.location.internalPage}`);
+    }
   });
 
   test("echoes retrieve scope in provenance", async () => {

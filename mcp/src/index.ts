@@ -115,7 +115,7 @@ const tools = [
 ] as const;
 
 const jsonContent = (value: unknown, isError = false) => ({
-  content: [{ type: "text" as const, text: JSON.stringify(value) }],
+  content: [{ type: "text" as const, text: JSON.stringify(value, (key, item) => key === "raw" ? undefined : item) }],
   ...(isError && { isError: true }),
 });
 

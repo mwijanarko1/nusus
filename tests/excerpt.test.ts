@@ -36,7 +36,7 @@ describe("excerpt engine", () => {
 
     const short = "نص قصير كامل";
     const full = boundText(short, 100, "نص");
-    expect(full).toEqual({ text: short, truncated: false });
+    expect(full).toEqual({ text: short, offset: 0, truncated: false });
   });
 
   test("does not keep a second prefix ladder in snippetNeedles", () => {
@@ -46,9 +46,16 @@ describe("excerpt engine", () => {
     expect(needles.filter((n) => n === plain || n.startsWith("س"))).toEqual([plain]);
   });
 
+  test("reports the adjusted offset when a window would split a surrogate pair", () => {
+    const text = `😀${"a".repeat(9)}needle${"b".repeat(20)}`;
+    const result = boundText(text, 26, "needle");
+    expect(result.offset).toBe(2);
+    expect(result.text).toBe(text.slice(result.offset, result.offset + result.text.length));
+  });
+
   test("prefix fallback still works without a snippet match", () => {
     const page = `${"أ".repeat(60)}نهاية`;
     const result = boundText(page, 20, "لا_تطابق");
-    expect(result).toEqual({ text: truncatePrefix(page, 20), truncated: true, truncation: "prefix" });
+    expect(result).toEqual({ text: truncatePrefix(page, 20), offset: 0, truncated: true, truncation: "prefix" });
   });
 });

@@ -117,25 +117,27 @@ export const windowAround = (
   matchIndex: number,
   matchLength: number,
   maxChars: number,
-): string => {
-  if (maxChars <= 0) return "";
+): { text: string; offset: number } => {
+  if (maxChars <= 0) return { text: "", offset: 0 };
 
-  // Hard upper bound: never return more than maxChars (aside from surrogate-safe trim).
-  if (matchLength >= maxChars) {
-    return truncatePrefix(safeSlice(text, matchIndex, matchIndex + maxChars + 2), maxChars);
+  let start = matchIndex;
+  if (matchLength < maxChars) {
+    start = Math.max(0, matchIndex - Math.floor((maxChars - matchLength) / 2));
+    start = Math.min(start, Math.max(0, text.length - maxChars));
   }
-
-  let start = Math.max(0, matchIndex - Math.floor((maxChars - matchLength) / 2));
-  start = Math.min(start, Math.max(0, text.length - maxChars));
-  return truncatePrefix(safeSlice(text, start, start + maxChars + 2), maxChars);
+  if (start > 0 && /[\uDC00-\uDFFF]/.test(text[start]!) && /[\uD800-\uDBFF]/.test(text[start - 1]!)) start += 1;
+  return {
+    text: truncatePrefix(safeSlice(text, start, start + maxChars + 2), maxChars),
+    offset: start,
+  };
 };
 
 export const boundText = (
   text: string,
   maxChars: number,
   snippet?: string,
-): { text: string; truncated: boolean; truncation?: "prefix" | "match-window" } => {
-  if (text.length <= maxChars) return { text, truncated: false };
+): { text: string; offset: number; truncated: boolean; truncation?: "prefix" | "match-window" } => {
+  if (text.length <= maxChars) return { text, offset: 0, truncated: false };
 
   // Prefer earlier needles (em terms first), then longer located spans.
   let best: { index: number; length: number; rank: number } | undefined;
@@ -151,11 +153,11 @@ export const boundText = (
 
   if (best) {
     return {
-      text: windowAround(text, best.index, best.length, maxChars),
+      ...windowAround(text, best.index, best.length, maxChars),
       truncated: true,
       truncation: "match-window",
     };
   }
 
-  return { text: truncatePrefix(text, maxChars), truncated: true, truncation: "prefix" };
+  return { text: truncatePrefix(text, maxChars), offset: 0, truncated: true, truncation: "prefix" };
 };

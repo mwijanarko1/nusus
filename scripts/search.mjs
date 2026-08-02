@@ -115,6 +115,7 @@ const emit = (format, record) => {
 const toPassageRecord = (passage) => {
   const record = {
     type: "passage",
+    provider: passage.provider ?? "turath",
     book: passage.book,
     location: passage.location,
     text: passage.text,
@@ -127,6 +128,7 @@ const toPassageRecord = (passage) => {
   if (passage.snippet !== undefined) record.snippet = passage.snippet;
   if (passage.locator) record.locator = passage.locator;
   if (passage.provenance) record.provenance = passage.provenance;
+  if (passage.segments) record.segments = passage.segments;
   return record;
 };
 
@@ -415,6 +417,7 @@ const COMMANDS = {
         query,
         totalMatches: result.totalMatches,
         page: result.page,
+        ...(result.effectiveQuery && { effectiveQuery: result.effectiveQuery }),
         sort: sortRaw,
         ...(scope.bookIds && { bookIds: scope.bookIds }),
         ...(scope.authorIds && { authorIds: scope.authorIds }),
@@ -462,6 +465,7 @@ const COMMANDS = {
         command: "retrieve",
         query,
         totalMatches: result.totalMatches,
+        ...(result.effectiveQuery && { effectiveQuery: result.effectiveQuery }),
         maxPassages,
         maxChars,
         pagesBefore,

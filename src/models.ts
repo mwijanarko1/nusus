@@ -70,6 +70,7 @@ export type RetrieveScope = {
 
 export type PassageProvenance = {
   query: string;
+  effectiveQuery?: string;
   scope?: RetrieveScope;
   rank: number;
   totalMatches: number;
@@ -77,6 +78,15 @@ export type PassageProvenance = {
   truncation?: "prefix" | "match-window";
   contextPages: { before: number; after: number };
   retrievedVia: "page" | "search-hit";
+};
+
+export type PassageSegment = {
+  start: number;
+  end: number;
+  location: SourceLocation;
+  url: string;
+  citation: string;
+  locator?: SourceLocator;
 };
 
 export type Passage = {
@@ -92,6 +102,8 @@ export type Passage = {
   citation: string;
   locator?: SourceLocator;
   provenance?: PassageProvenance;
+  /** Per-page offsets into text for multi-page context passages. */
+  segments?: PassageSegment[];
   raw?: unknown;
 };
 
@@ -99,12 +111,16 @@ export type SearchPage = {
   items: Passage[];
   totalMatches: number;
   page: number;
+  /** Query sent upstream when normalized fallback was needed. */
+  effectiveQuery?: string;
 };
 
 export type RetrievedContext = {
   passages: Passage[];
   totalMatches: number;
   query: string;
+  /** Query sent upstream when normalized fallback was needed. */
+  effectiveQuery?: string;
 };
 
 export type CatalogMetadata = {

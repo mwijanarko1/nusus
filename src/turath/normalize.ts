@@ -5,6 +5,8 @@ import type { RawAuthor, RawBook, RawPage, RawPageMeta, RawSearchHit } from "./r
 
 const record = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+const plainText = (value: string): string => value.replace(/<br\s*\/?\s*>/gi, "\n").replace(/<[^>]*>/g, "");
+
 const extractIndexes = (raw: Record<string, unknown>): { toc?: BookTocEntry[]; volumes?: string[] } => {
   const indexes = raw.indexes;
   if (!record(indexes)) return {};
@@ -94,7 +96,7 @@ export const normalizePage = (raw: unknown, bookId: string): Passage => {
       ...(typeof meta.page === "number" && { printedPage: meta.page }),
       ...(typeof meta.vol === "string" && { volume: meta.vol }),
     },
-    text: page.text,
+    text: plainText(page.text),
     headings: Array.isArray(meta.headings) && meta.headings.every((item) => typeof item === "string") ? meta.headings : [],
     raw,
   });
@@ -117,8 +119,8 @@ export const normalizeSearchHit = (raw: unknown): Passage => {
       ...(typeof meta.page === "number" && { printedPage: meta.page }),
       ...(typeof meta.vol === "string" && { volume: meta.vol }),
     },
-    text: hit.text,
-    ...(typeof hit.snip === "string" && { snippet: hit.snip }),
+    text: plainText(hit.text),
+    ...(typeof hit.snip === "string" && { snippet: plainText(hit.snip) }),
     headings: Array.isArray(meta.headings) && meta.headings.every((item) => typeof item === "string") ? meta.headings : [],
     raw,
   });

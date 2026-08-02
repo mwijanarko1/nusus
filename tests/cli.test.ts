@@ -182,6 +182,7 @@ describe("nusus CLI", () => {
     });
     const passage = result.lines[1] as {
       type: string;
+      provider: string;
       citation: string;
       url: string;
       headings: string[];
@@ -189,6 +190,7 @@ describe("nusus CLI", () => {
       book: { id: string };
     };
     expect(passage.type).toBe("passage");
+    expect(passage.provider).toBe("turath");
     expect(passage.book.id).toBe("147927");
     expect(passage.citation).toContain("تراث");
     expect(passage.url).toContain("https://app.turath.io/book/147927");
@@ -436,7 +438,8 @@ describe("nusus CLI", () => {
       "1",
     ]);
     expect(contextResult.code).toBe(0);
-    expect(contextResult.lines[0]).toMatchObject({ type: "passage", book: { id: "147927" } });
+    expect(contextResult.lines[0]).toMatchObject({ type: "passage", provider: "turath", book: { id: "147927" } });
+    expect((contextResult.lines[0] as { segments: unknown[] }).segments).toHaveLength(3);
     expect(String((contextResult.lines[0] as { text: string }).text).length).toBeGreaterThan(
       String((pageResult.lines[0] as { text: string }).text).length,
     );

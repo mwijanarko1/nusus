@@ -116,7 +116,7 @@ for (const passage of context.passages) {
 }
 ```
 
-All requests support `AbortSignal`; failures use the exported `NususError` codes. Source text is returned unchanged. Search filters currently accept one Turath ID each because that is all the upstream API has verified. The core SDK is retrieval-only: no madhhab ranking, fatwa logic, or hadith grading.
+All requests support `AbortSignal`; failures use the exported `NususError` codes. Public passage text is plain Arabic with Turath presentation/highlight tags removed; low-level page/search/book calls retain the exact upstream payload in optional `raw`, while agent-ready `retrieve()` omits it. If an exact live query has zero matches, search tries normalized Arabic variants and reports the first successful one as `effectiveQuery`. Multi-page context includes `segments` with per-page text offsets, citations, locators, and URLs. Search filters currently accept one Turath ID each because that is all the upstream API has verified. The core SDK is retrieval-only: no madhhab ranking, fatwa logic, or hadith grading.
 
 ## Agent CLI
 
