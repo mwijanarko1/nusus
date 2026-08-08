@@ -80,7 +80,6 @@ describe("nusus-mcp stdio server", () => {
   });
 
   test("keeps manifest and server versions aligned", () => {
-    expect(manifest.version).toBe("0.2.0");
     expect(legacyClient.getServerVersion()?.version).toBe(manifest.version);
     expect(modernClient.getServerVersion()?.version).toBe(manifest.version);
   });

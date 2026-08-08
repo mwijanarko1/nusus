@@ -186,7 +186,10 @@ const createServer = () => {
 
 try {
   serveStdio(createServer, {
-    onerror: (error) => process.stderr.write(`nusus-mcp failed: ${error.message}\n`),
+    onerror: (error) => {
+      process.stderr.write(`nusus-mcp failed: ${error.message}\n`);
+      process.exitCode = 1;
+    },
   });
 } catch (error) {
   process.stderr.write(`nusus-mcp failed: ${error instanceof Error ? error.message : String(error)}\n`);
