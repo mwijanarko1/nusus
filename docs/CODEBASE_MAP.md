@@ -81,7 +81,7 @@ Contracts:
 
 ### MCP research
 
-An MCP client starts `nusus-mcp` and communicates over stdio. The server imports `nusus` / `nusus/turath` directly and exposes `find_books`, `find_authors`, `retrieve`, `get_context`, and `get_book`. Tool results are JSON text; `NususError` codes are preserved in error results.
+An MCP client starts `nusus-mcp` and communicates over stdio. The SDK v2 `serveStdio` entry serves both legacy clients and protocol `2026-07-28` clients from the same low-level server factory. The server imports `nusus` / `nusus/turath` directly and exposes `find_books`, `find_authors`, `retrieve`, `get_context`, and `get_book`. Tool results are JSON text; `NususError` codes are preserved in error results.
 
 ### SDK retrieval
 

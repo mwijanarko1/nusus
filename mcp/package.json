@@ -1,6 +1,6 @@
 {
   "name": "nusus-mcp",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Local MCP stdio server for Nusus and Turath",
   "keywords": [
     "turath",
@@ -41,11 +41,14 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/server": "^2.0.0",
     "nusus": "^0.6.2"
   },
   "engines": {
     "node": ">=20"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@modelcontextprotocol/client": "^2.0.0"
+  }
 }

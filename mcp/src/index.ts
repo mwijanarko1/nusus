@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { Server, type Tool } from "@modelcontextprotocol/server";
+import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { NususError } from "nusus";
 import { createTurathClient } from "nusus/turath";
 
@@ -39,7 +38,7 @@ const optional = <T extends Record<string, unknown>>(values: T): T =>
 const baseUrl = process.env.NUSUS_TURATH_BASE_URL;
 const turath = createTurathClient(baseUrl ? { baseUrl } : {});
 
-const tools = [
+const tools: Tool[] = [
   {
     name: "find_books",
     description: "Find books in Nusus's bundled offline Turath catalog by Arabic title and optional single author/category filters.",
@@ -112,7 +111,7 @@ const tools = [
       additionalProperties: false,
     },
   },
-] as const;
+];
 
 const jsonContent = (value: unknown, isError = false) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, (key, item) => key === "raw" ? undefined : item) }],
@@ -165,24 +164,30 @@ const runTool = async (name: string, args: Arguments) => {
   }
 };
 
-const server = new Server(
-  { name: "nusus-mcp", version: "0.1.1" },
-  { capabilities: { tools: {} } },
-);
+const createServer = () => {
+  const server = new Server(
+    { name: "nusus-mcp", version: "0.2.0" },
+    { capabilities: { tools: {} } },
+  );
 
-server.setRequestHandler(ListToolsRequestSchema, async () => ({ tools: [...tools] }));
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  try {
-    return jsonContent(await runTool(request.params.name, request.params.arguments ?? {}));
-  } catch (error) {
-    if (error instanceof NususError) return jsonContent({ code: error.code, message: error.message }, true);
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return jsonContent({ code: "INTERNAL", message }, true);
-  }
-});
+  server.setRequestHandler("tools/list", async () => ({ tools: [...tools] }));
+  server.setRequestHandler("tools/call", async (request) => {
+    try {
+      return jsonContent(await runTool(request.params.name, request.params.arguments ?? {}));
+    } catch (error) {
+      if (error instanceof NususError) return jsonContent({ code: error.code, message: error.message }, true);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      return jsonContent({ code: "INTERNAL", message }, true);
+    }
+  });
+
+  return server;
+};
 
 try {
-  await server.connect(new StdioServerTransport());
+  serveStdio(createServer, {
+    onerror: (error) => process.stderr.write(`nusus-mcp failed: ${error.message}\n`),
+  });
 } catch (error) {
   process.stderr.write(`nusus-mcp failed: ${error instanceof Error ? error.message : String(error)}\n`);
   process.exitCode = 1;
