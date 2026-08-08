@@ -42,6 +42,7 @@ describe("Turath client", () => {
     expect(normalizedPage.text).toStartWith("الحديث الأول: [الأعمال بالنيات]");
     expect(normalizedPage.citation).toBe("النووي، الأربعون النووية مع زيادات ابن رجب، ج 1، ص 5، صفحة تراث 5، تراث 147927");
     expect(normalizedPage.url).toBe("https://app.turath.io/book/147927?page=5");
+    expect(normalizedPage.alternateUrls).toEqual({ shamela: "https://shamela.ws/book/147927/5" });
     expect(normalizedPage.locator).toEqual({
       bookId: "147927",
       internalPage: 5,
@@ -81,6 +82,7 @@ describe("Turath client", () => {
     const result = await client.search("الإسلام", { bookIds: [147927], sort: "page" });
 
     expect(result.items.length).toBeGreaterThan(0);
+    expect(result.items[0]?.alternateUrls).toEqual({ shamela: "https://shamela.ws/book/147927/25" });
     expect(calls[0]?.searchParams.get("book")).toBe("147927");
     expect(calls[0]?.searchParams.get("sort")).toBe("page_id");
     expect(calls[0]?.searchParams.get("ver")).toBe("3");
@@ -369,10 +371,12 @@ describe("retrieve context and provenance", () => {
     expect(wide.passages[0]?.text).toContain("نص الصفحة 5");
     expect(wide.passages[0]?.text).toContain("نص الصفحة 6");
     expect(wide.passages[0]?.provenance?.contextPages).toEqual({ before: 1, after: 1 });
+    expect(wide.passages[0]?.alternateUrls).toEqual({ shamela: "https://shamela.ws/book/3/5" });
     expect(wide.passages[0]?.segments).toHaveLength(3);
     for (const segment of wide.passages[0]?.segments ?? []) {
       expect(wide.passages[0]?.text.slice(segment.start, segment.end)).toBe(`نص الصفحة ${segment.location.internalPage}`);
       expect(segment.citation).toContain(`صفحة تراث ${segment.location.internalPage}`);
+      expect(segment.alternateUrls?.shamela).toBe(`https://shamela.ws/book/3/${segment.location.internalPage}`);
     }
   });
 

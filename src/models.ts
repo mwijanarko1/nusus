@@ -62,6 +62,10 @@ export type SourceLocator = {
   url: string;
 };
 
+export type AlternateUrls = {
+  shamela: string;
+};
+
 export type RetrieveScope = {
   bookIds?: TurathId[];
   authorIds?: TurathId[];
@@ -85,6 +89,7 @@ export type PassageSegment = {
   end: number;
   location: SourceLocation;
   url: string;
+  alternateUrls?: AlternateUrls;
   citation: string;
   locator?: SourceLocator;
 };
@@ -99,6 +104,7 @@ export type Passage = {
   snippet?: string;
   headings: string[];
   url: string;
+  alternateUrls?: AlternateUrls;
   citation: string;
   locator?: SourceLocator;
   provenance?: PassageProvenance;

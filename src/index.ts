@@ -1,6 +1,7 @@
 export { NususError } from "./errors.js";
 export type { NususErrorCode } from "./errors.js";
 export type {
+  AlternateUrls,
   Author,
   AuthorSummary,
   Book,

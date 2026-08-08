@@ -14,5 +14,5 @@ export type {
   TurathClientOptions,
   TurathSearchOptions,
 } from "./client.js";
-export { decoratePassage, formatCitation, getLocator, getSourceUrl } from "./citations.js";
+export { decoratePassage, formatCitation, getLocator, getShamelaUrl, getSourceUrl } from "./citations.js";
 export type { CitationSource } from "./citations.js";

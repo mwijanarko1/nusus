@@ -92,7 +92,9 @@ const writeText = (record) => {
       break;
     case "passage":
       process.stdout.write(
-        `passage\t${record.book?.id ?? "?"}\t${record.citation ?? ""}\t${record.url ?? ""}\t${preview(record.text)}\n`,
+        `passage\t${record.book?.id ?? "?"}\t${record.citation ?? ""}\t${record.url ?? ""}` +
+          (record.alternateUrls?.shamela ? `\t${record.alternateUrls.shamela}` : "") +
+          `\t${preview(record.text)}\n`,
       );
       break;
     case "toc-entry":
@@ -123,6 +125,7 @@ const toPassageRecord = (passage) => {
     url: passage.url,
     citation: passage.citation,
   };
+  if (passage.alternateUrls) record.alternateUrls = passage.alternateUrls;
   if (passage.author) record.author = passage.author;
   if (passage.category) record.category = passage.category;
   if (passage.snippet !== undefined) record.snippet = passage.snippet;

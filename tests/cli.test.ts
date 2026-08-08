@@ -185,6 +185,7 @@ describe("nusus CLI", () => {
       provider: string;
       citation: string;
       url: string;
+      alternateUrls: { shamela: string };
       headings: string[];
       text: string;
       book: { id: string };
@@ -194,6 +195,7 @@ describe("nusus CLI", () => {
     expect(passage.book.id).toBe("147927");
     expect(passage.citation).toContain("تراث");
     expect(passage.url).toContain("https://app.turath.io/book/147927");
+    expect(passage.alternateUrls).toEqual({ shamela: "https://shamela.ws/book/147927/25" });
     expect(Array.isArray(passage.headings)).toBe(true);
     expect(passage.text.length).toBeGreaterThan(0);
   });
@@ -209,6 +211,7 @@ describe("nusus CLI", () => {
       bookIds: ["147927"],
     });
     expect(single.lines.some((line) => line.type === "passage")).toBe(true);
+    expect(single.lines[1]?.alternateUrls).toEqual({ shamela: "https://shamela.ws/book/147927/25" });
 
     const combined = await run([
       "search",
@@ -438,8 +441,19 @@ describe("nusus CLI", () => {
       "1",
     ]);
     expect(contextResult.code).toBe(0);
-    expect(contextResult.lines[0]).toMatchObject({ type: "passage", provider: "turath", book: { id: "147927" } });
-    expect((contextResult.lines[0] as { segments: unknown[] }).segments).toHaveLength(3);
+    expect(contextResult.lines[0]).toMatchObject({
+      type: "passage",
+      provider: "turath",
+      book: { id: "147927" },
+      alternateUrls: { shamela: "https://shamela.ws/book/147927/5" },
+    });
+    const contextSegments = (contextResult.lines[0] as { segments: { alternateUrls: { shamela: string } }[] }).segments;
+    expect(contextSegments).toHaveLength(3);
+    expect(contextSegments.map((segment) => segment.alternateUrls.shamela)).toEqual([
+      "https://shamela.ws/book/147927/4",
+      "https://shamela.ws/book/147927/5",
+      "https://shamela.ws/book/147927/6",
+    ]);
     expect(String((contextResult.lines[0] as { text: string }).text).length).toBeGreaterThan(
       String((pageResult.lines[0] as { text: string }).text).length,
     );
@@ -545,6 +559,18 @@ describe("nusus CLI", () => {
     } finally {
       emptyServer.stop(true);
     }
+  });
+
+  test("--format text passage includes primary Turath and alternate Shamela URLs", async () => {
+    const result = await run(
+      ["get-page", "--book-id", "147927", "--page-id", "5", "--format", "text"],
+      {},
+      { jsonl: false },
+    );
+    expect(result.code).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(result.stdout).toContain("https://app.turath.io/book/147927?page=5");
+    expect(result.stdout).toContain("https://shamela.ws/book/147927/5");
   });
 
   test("--format text writes human lines; errors still JSON on stderr", async () => {

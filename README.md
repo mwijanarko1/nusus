@@ -96,7 +96,8 @@ const context = await turath.getContext(results.items[0]);
 console.log(context.text);
 console.log(context.citation);
 console.log(context.locator);
-console.log(context.url);
+console.log(context.url); // primary Turath URL
+console.log(context.alternateUrls?.shamela); // same book/page on Shamela
 ```
 
 Agent-ready retrieval is one call. By default each hit is a single page with a match-centered excerpt; adjacent pages are opt-in:
@@ -116,7 +117,7 @@ for (const passage of context.passages) {
 }
 ```
 
-All requests support `AbortSignal`; failures use the exported `NususError` codes. Public passage text is plain Arabic with Turath presentation/highlight tags removed; low-level page/search/book calls retain the exact upstream payload in optional `raw`, while agent-ready `retrieve()` omits it. If an exact live query has zero matches, search tries normalized Arabic variants and reports the first successful one as `effectiveQuery`. Multi-page context includes `segments` with per-page text offsets, citations, locators, and URLs. Search filters currently accept one Turath ID each because that is all the upstream API has verified. The core SDK is retrieval-only: no madhhab ranking, fatwa logic, or hadith grading.
+All requests support `AbortSignal`; failures use the exported `NususError` codes. Public passage text is plain Arabic with Turath presentation/highlight tags removed; low-level page/search/book calls retain the exact upstream payload in optional `raw`, while agent-ready `retrieve()` omits it. Passage `url` remains the primary Turath link; when an internal page ID is available, `alternateUrls.shamela` links to the same book/page on Shamela. If an exact live query has zero matches, search tries normalized Arabic variants and reports the first successful one as `effectiveQuery`. Multi-page context includes `segments` with per-page text offsets, citations, locators, primary URLs, and Shamela alternate URLs. Search filters currently accept one Turath ID each because that is all the upstream API has verified. The core SDK is retrieval-only: no madhhab ranking, fatwa logic, or hadith grading.
 
 ## Agent CLI
 

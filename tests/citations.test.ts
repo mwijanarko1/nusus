@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { decoratePassage, formatCitation, getLocator, getSourceUrl } from "../src/turath/citations.js";
+import { decoratePassage, formatCitation, getLocator, getShamelaUrl, getSourceUrl } from "../src/turath/citations.js";
 
 const source = {
   author: { name: "النووي" },
@@ -30,6 +30,11 @@ describe("citations and locators", () => {
     expect(getSourceUrl(source)).toBe(locator.url);
   });
 
+  test("constructs a Shamela alternate URL from the shared book and internal page IDs", () => {
+    expect(getShamelaUrl(source)).toBe("https://shamela.ws/book/147927/5");
+    expect(getShamelaUrl({ ...source, location: {} })).toBeUndefined();
+  });
+
   test("citation still carries book id when only internal page exists", () => {
     const citation = formatCitation({
       book: { id: "99", title: "كتاب" },
@@ -38,7 +43,7 @@ describe("citations and locators", () => {
     expect(citation).toBe("كتاب، صفحة تراث 3، تراث 99");
   });
 
-  test("decoratePassage is the canonical citation/url/locator helper", () => {
+  test("decoratePassage derives alternate URLs and removes stale input when no internal page exists", () => {
     const decorated = decoratePassage({
       provider: "turath" as const,
       book: source.book,
@@ -46,10 +51,19 @@ describe("citations and locators", () => {
       location: source.location,
       text: "نص",
       headings: [],
+      alternateUrls: { shamela: "https://example.invalid/stale" },
     });
     expect(decorated.citation).toBe(formatCitation(source));
     expect(decorated.url).toBe(getSourceUrl(source));
+    expect(decorated.alternateUrls).toEqual({ shamela: getShamelaUrl(source) });
     expect(decorated.locator).toEqual(getLocator(source));
     expect(decorated.text).toBe("نص");
+
+    const withoutPage = decoratePassage({
+      ...decorated,
+      location: {},
+      alternateUrls: { shamela: "https://example.invalid/stale" },
+    });
+    expect(withoutPage).not.toHaveProperty("alternateUrls");
   });
 });

@@ -10,7 +10,7 @@ import type {
   TurathId,
 } from "../models.js";
 import { createTransport, type TransportOptions } from "../transport.js";
-import { decoratePassage, formatCitation, getLocator, getSourceUrl, type CitationSource } from "./citations.js";
+import { decoratePassage, formatCitation, getLocator, getShamelaUrl, getSourceUrl, type CitationSource } from "./citations.js";
 import {
   findCatalogAuthors,
   findCatalogBooks,
@@ -246,6 +246,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
         end: offset,
         location: page.location,
         url: page.url,
+        ...(page.alternateUrls && { alternateUrls: page.alternateUrls }),
         citation: page.citation,
         ...(page.locator && { locator: page.locator }),
       };
@@ -377,6 +378,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     formatCitation: (source: CitationSource) => formatCitation(source),
     getLocator: (source: CitationSource) => getLocator(source),
     getSourceUrl: (source: CitationSource) => getSourceUrl(source),
+    getShamelaUrl: (source: CitationSource) => getShamelaUrl(source),
   };
 };
 
