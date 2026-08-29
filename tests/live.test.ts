@@ -18,7 +18,7 @@ liveTest("live Turath contract shapes", async () => {
   ]);
 
   expect(author.id).toBe("44");
-  expect(typeof author.name).toBe("string");
+  expect(author.name).toEqual(expect.any(String));
   expect(author.name!.length).toBeGreaterThan(0);
 
   expect(book.id).toBe("147927");
@@ -44,5 +44,5 @@ liveTest("live Turath contract shapes", async () => {
   expect(passage.locator?.bookId).toBeTruthy();
   expect(passage.provenance?.query).toBe("إنما الأعمال بالنيات");
   expect(passage.provenance?.rank).toBe(0);
-  expect(typeof passage.provenance?.totalMatches).toBe("number");
+  expect(passage.provenance?.totalMatches).toEqual(expect.any(Number));
 });

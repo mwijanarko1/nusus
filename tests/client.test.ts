@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { NususError } from "../src/errors.js";
 import { createTurathClient } from "../src/turath/client.js";
+import { decodeAuthor, type JsonValue } from "../src/turath/decode.js";
 
 const fixture = (name: string) => Bun.file(new URL(`fixtures/${name}.json`, import.meta.url)).json();
 const [author, book, page, search] = await Promise.all([
@@ -23,7 +24,7 @@ const client = createTurathClient({
           ? page
           : search;
     return Response.json(body);
-  }) as typeof fetch,
+  }),
 });
 
 describe("Turath client", () => {
@@ -54,7 +55,7 @@ describe("Turath client", () => {
 
   test("removes HTML tags without deleting literal angle-bracket text", async () => {
     const literal = createTurathClient({
-      fetch: (async () => Response.json({ ...page, text: "<span>نص</span> <تصحيح>" })) as typeof fetch,
+      fetch: async () => Response.json({ ...page, text: "<span>نص</span> <تصحيح>" }),
     });
     expect((await literal.getPage(147927, 5)).text).toBe("نص <تصحيح>");
   });
@@ -115,7 +116,7 @@ describe("Turath client", () => {
         const query = url.searchParams.get("q") ?? "";
         queries.push(query);
         return Response.json(query === "الحمد لله رب العالمين" ? { count: 1, data: [search.data[0]] } : { count: 0, data: [] });
-      }) as typeof fetch,
+      }),
     });
 
     const query = "ٱلْحَمْدُ لِلَّهِ رَبِّ ٱلْعَٰلَمِينَ";
@@ -135,7 +136,7 @@ describe("Turath client", () => {
         requests.push(`${query}:${pageNumber}`);
         if (query !== "الحمد لله") return Response.json({ count: 0, data: [] });
         return Response.json({ count: 2, data: [search.data[0]] });
-      }) as typeof fetch,
+      }),
     });
 
     const items = [];
@@ -157,7 +158,7 @@ describe("Turath client", () => {
           const value = new URL(String(input)).searchParams.get("q") ?? "";
           queries.push(value);
           return Response.json(value === accepted ? { count: 1, data: [search.data[0]] } : { count: 0, data: [] });
-        }) as typeof fetch,
+        }),
       });
       const result = await fallback.search(query);
       expect(result.effectiveQuery).toBe(accepted);
@@ -174,7 +175,7 @@ describe("Turath client", () => {
       fetch: (async (input) => {
         exactSpelling.push(new URL(String(input)).searchParams.get("q") ?? "");
         return Response.json({ count: 0, data: [] });
-      }) as typeof fetch,
+      }),
     });
     await noTaaMarbutaFallback.search("رحمة");
     expect(exactSpelling).toEqual(["رحمة"]);
@@ -189,7 +190,7 @@ describe("Turath client", () => {
         if (url.pathname.endsWith("/page")) return Response.json(page);
         pagesRequested.push(url.searchParams.get("page") ?? "1");
         return Response.json({ count: 21, data: url.searchParams.get("page") === "2" ? [hit] : Array(20).fill(hit) });
-      }) as typeof fetch,
+      }),
     });
 
     const result = await paged.retrieve("الإسلام", { maxPassages: 21 });
@@ -197,8 +198,44 @@ describe("Turath client", () => {
     expect(pagesRequested).toEqual(["1", "2"]);
   });
 
+  test("page-2 retrieve hits use their own raw snippet for match-centered excerpt", async () => {
+    const prefix = "أ".repeat(200);
+    const page2Match = "كلمة_البحث_الثانية";
+    const suffix = "ب".repeat(200);
+    const page2Text = `${prefix}${page2Match}${suffix}`;
+    const page1Hit = search.data[0];
+    const page2Hit = {
+      ...search.data[0],
+      snip: `مقدمة <em>${page2Match}</em> خاتمة`,
+      text: page2Text,
+    };
+    const paged = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          return Response.json({
+            meta: JSON.stringify({ headings: [], page_id: 9, page: 9, vol: "1", book_name: "كتاب", author_name: "مؤلف" }),
+            text: page2Text,
+          });
+        }
+        const pageNum = url.searchParams.get("page") ?? "1";
+        return Response.json({
+          count: 21,
+          data: pageNum === "2" ? [page2Hit] : Array(20).fill(page1Hit),
+        });
+      }),
+    });
+
+    const result = await paged.retrieve("الإسلام", { maxPassages: 21, maxCharsPerPassage: 80 });
+    const page2Passage = result.passages[20];
+    expect(page2Passage).toBeDefined();
+    expect(page2Passage.text).toContain(page2Match);
+    expect(page2Passage.text.startsWith("أ".repeat(80))).toBe(false);
+    expect(page2Passage.provenance?.truncation).toBe("match-window");
+  });
+
   test("maps empty-object records to NOT_FOUND", async () => {
-    const missing = createTurathClient({ fetch: (async () => Response.json({})) as typeof fetch });
+    const missing = createTurathClient({ fetch: async () => Response.json({}) });
     try {
       await missing.getAuthor(999999999);
       throw new Error("expected failure");
@@ -249,7 +286,7 @@ describe("retrieve context and provenance", () => {
             text: pageText,
           }],
         });
-      }) as typeof fetch,
+      }),
     });
 
     const result = await smart.retrieve("كلمة", { maxPassages: 1, maxCharsPerPassage: 80 });
@@ -289,7 +326,7 @@ describe("retrieve context and provenance", () => {
             text: pageText,
           }],
         });
-      }) as typeof fetch,
+      }),
     });
 
     const result = await plain.retrieve("بحث", { maxPassages: 1, maxCharsPerPassage: 40 });
@@ -317,7 +354,7 @@ describe("retrieve context and provenance", () => {
           });
         }
         return Response.json({});
-      }) as typeof fetch,
+      }),
     });
 
     await byPage.getContextByPage(3, 5, { pagesBefore: 1, pagesAfter: 1 });
@@ -352,7 +389,7 @@ describe("retrieve context and provenance", () => {
             text: "نص الصفحة 5",
           }],
         });
-      }) as typeof fetch,
+      }),
     });
 
     const one = await adjacent.retrieve("نص", { maxPassages: 1, maxCharsPerPassage: 500 });
@@ -412,7 +449,7 @@ describe("retrieve context and provenance", () => {
             text: pageText,
           }],
         });
-      }) as typeof fetch,
+      }),
     });
 
     const em = await make(`قبل <em>${longMatch}</em> بعد`).retrieve("مميزة", {
@@ -455,7 +492,7 @@ describe("retrieve context and provenance", () => {
             text: pageText,
           }],
         });
-      }) as typeof fetch,
+      }),
     });
 
     const result = await broken.retrieve("الإسلام", {
@@ -468,4 +505,205 @@ describe("retrieve context and provenance", () => {
     expect(passage.text.startsWith("أ".repeat(40))).toBe(false);
     expect(passage.provenance?.truncation).toBe("match-window");
   });
+});
+
+describe("rejects malformed but syntactically valid upstream JSON as INVALID_RESPONSE", () => {
+  const expectInvalid = async (promise: Promise<unknown>) => {
+    try {
+      await promise;
+      throw new Error("expected INVALID_RESPONSE");
+    } catch (error) {
+      expect(error).toBeInstanceOf(NususError);
+      expect(error).toMatchObject({ code: "INVALID_RESPONSE" });
+    }
+  };
+
+  test("null author root", () => {
+    const client = createTurathClient({ fetch: async () => Response.json(null) });
+    return expectInvalid(client.getAuthor(1));
+  });
+
+  test("author missing a required field", () => {
+    const client = createTurathClient({ fetch: async () => Response.json({ id: 1 }) });
+    return expectInvalid(client.getAuthor(1));
+  });
+
+  test("author with a wrong primitive type for a required field", () => {
+    const client = createTurathClient({ fetch: async () => Response.json({ id: 1, name: 5 }) });
+    return expectInvalid(client.getAuthor(1));
+  });
+
+  test("book with a malformed index entry skips the entry instead of rejecting", async () => {
+    const client = createTurathClient({
+      fetch: async () =>
+        Response.json({
+          meta: { id: 1, name: "كتاب" },
+          indexes: { headings: [{ title: "فصل", level: 1, page: 2 }, { title: 5 }, "not-a-record"] },
+        }),
+    });
+    const book = await client.getBook(1);
+    expect(book.toc).toEqual([{ title: "فصل", level: 1, page: 2 }]);
+  });
+
+  test("page with malformed metadata", () => {
+    const client = createTurathClient({
+      fetch: async () => Response.json({ meta: JSON.stringify({ book_name: 5 }), text: "نص" }),
+    });
+    return expectInvalid(client.getPage(1, 1));
+  });
+
+  test("search with a malformed hit", () => {
+    const client = createTurathClient({
+      fetch: async () => Response.json({ count: 1, data: [{ book_id: 1, meta: "x", text: 7 }] }),
+    });
+    return expectInvalid(client.search("q"));
+  });
+});
+
+describe("ignores malformed optional fields as baseline did", () => {
+  test("author ignores wrong-typed biography and death", async () => {
+    const client = createTurathClient({
+      fetch: async () => Response.json({ id: 44, name: "النووي", biography: 5, death: true }),
+    });
+    const author = await client.getAuthor(44);
+    expect(author.id).toBe("44");
+    expect(author.name).toBe("النووي");
+    expect(author.biography).toBeUndefined();
+    expect(author.deathYear).toBeUndefined();
+  });
+
+  test("book ignores wrong-typed optional meta fields and non-record indexes", async () => {
+    const client = createTurathClient({
+      fetch: async () =>
+        Response.json({
+          meta: { id: 1, name: "كتاب", author_id: "bad", cat_id: "bad", info: 5 },
+          indexes: "not-a-record",
+        }),
+    });
+    const book = await client.getBook(1);
+    expect(book.id).toBe("1");
+    expect(book.title).toBe("كتاب");
+    expect(book.author).toBeUndefined();
+    expect(book.category).toBeUndefined();
+    expect(book.description).toBeUndefined();
+    expect(book.toc).toBeUndefined();
+  });
+
+  test("book includes optional meta fields only when correct primitive types", async () => {
+    const client = createTurathClient({
+      fetch: async () =>
+        Response.json({
+          meta: { id: 1, name: "كتاب", author_id: 44, cat_id: 6, info: "وصف" },
+          indexes: { volumes: ["1", "2"] },
+        }),
+    });
+    const book = await client.getBook(1);
+    expect(book.author).toEqual({ id: "44" });
+    expect(book.category).toEqual({ id: "6" });
+    expect(book.description).toBe("وصف");
+    expect(book.volumes).toEqual(["1", "2"]);
+  });
+
+  test("book headings skip malformed entries and include level/page only when numbers", async () => {
+    const client = createTurathClient({
+      fetch: async () =>
+        Response.json({
+          meta: { id: 1, name: "كتاب" },
+          indexes: { headings: [{ title: "فصل", level: "bad", page: "bad" }, { title: "باب", level: 2, page: 3 }] },
+        }),
+    });
+    const book = await client.getBook(1);
+    expect(book.toc).toEqual([{ title: "فصل" }, { title: "باب", level: 2, page: 3 }]);
+  });
+
+  test("book volumes included only when the full array is strings", async () => {
+    const client = createTurathClient({
+      fetch: async () =>
+        Response.json({
+          meta: { id: 1, name: "كتاب" },
+          indexes: { volumes: ["1", 2, "3"] },
+        }),
+    });
+    const book = await client.getBook(1);
+    expect(book.volumes).toBeUndefined();
+  });
+
+  test("page ignores wrong optional metadata fields and defaults headings to []", async () => {
+    const client = createTurathClient({
+      fetch: async () =>
+        Response.json({
+          meta: JSON.stringify({ book_name: "كتاب", author_name: 5, page_id: "bad", page: "bad", vol: 3, headings: [1, 2] }),
+          text: "نص",
+        }),
+    });
+    const page = await client.getPage(1, 1);
+    expect(page.book.title).toBe("كتاب");
+    expect(page.author).toBeUndefined();
+    expect(page.location.internalPage).toBeUndefined();
+    expect(page.location.printedPage).toBeUndefined();
+    expect(page.location.volume).toBeUndefined();
+    expect(page.headings).toEqual([]);
+  });
+
+  test("search hit ignores wrong optional fields", async () => {
+    const client = createTurathClient({
+      fetch: async () =>
+        Response.json({
+          count: 1,
+          data: [{ book_id: 1, meta: JSON.stringify({ book_name: "كتاب" }), text: "نص", author_id: "bad", cat_id: "bad", snip: 5 }],
+        }),
+    });
+    const result = await client.search("q");
+    const hit = result.items[0]!;
+    expect(hit.book.id).toBe("1");
+    expect(hit.author).toBeUndefined();
+    expect(hit.category).toBeUndefined();
+    expect(hit.snippet).toBeUndefined();
+  });
+
+  test("search envelope accepts non-integer count", async () => {
+    const client = createTurathClient({
+      fetch: async () => Response.json({ count: 1.5, data: [] }),
+    });
+    const result = await client.search("q");
+    expect(result.totalMatches).toBe(1.5);
+  });
+});
+
+test("preserves extra top-level and nested upstream fields in public raw", async () => {
+  const payload = {
+    id: 44,
+    name: "النووي",
+    biography: "سيرة",
+    extraTop: "keep",
+    extraNested: { deep: [1, 2, 3], flag: true },
+  };
+  const client = createTurathClient({ fetch: async () => Response.json(payload) });
+  const author = await client.getAuthor(44);
+  expect(author.raw).toEqual(payload);
+});
+
+test("preserves an own __proto__ JSON key without mutating the prototype", async () => {
+  const payload = { id: 44, name: "النووي" };
+  Object.defineProperty(payload, "__proto__", {
+    value: { marker: 1 },
+    enumerable: true,
+    configurable: true,
+    writable: true,
+  });
+  const client = createTurathClient({ fetch: async () => Response.json(payload) });
+  const author = await client.getAuthor(44);
+  expect(Object.getPrototypeOf(author.raw)).toBe(Object.prototype);
+  expect(Object.prototype.hasOwnProperty.call(author.raw, "__proto__")).toBe(true);
+  expect(Object.getOwnPropertyDescriptor(author.raw, "__proto__")?.value).toEqual({ marker: 1 });
+});
+
+test("decoder rejects inherited id/name that bypass own-property validation", () => {
+  const inherited: JsonValue = Object.create({ id: 1, name: "موروث" });
+  expect(() => decodeAuthor(inherited)).toThrow(NususError);
+  try {
+    decodeAuthor(inherited);
+  } catch (error) {
+    expect(error).toMatchObject({ code: "INVALID_RESPONSE" });
+  }
 });

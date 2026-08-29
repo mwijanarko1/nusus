@@ -1,4 +1,5 @@
 import { NususError } from "./errors.js";
+import { toJsonValue, type JsonInput, type JsonValue } from "./turath/json.js";
 
 export type FetchLike = typeof fetch;
 
@@ -7,6 +8,10 @@ export type TransportOptions = {
   fetch?: FetchLike;
   timeout?: number;
 };
+
+type FetchInput = FetchLike | string | number | boolean | bigint | symbol | null | undefined;
+
+const isFunction = (value: FetchInput): value is FetchLike => typeof value === "function";
 
 const retryAfterSeconds = (value: string | null): number | undefined => {
   if (!value) return undefined;
@@ -21,14 +26,14 @@ export const createTransport = ({
   fetch: fetcher = globalThis.fetch,
   timeout = 10_000,
 }: TransportOptions = {}) => {
-  if (typeof fetcher !== "function") {
+  if (!isFunction(fetcher)) {
     throw new NususError("INVALID_ARGUMENT", "A fetch implementation is required");
   }
   if (!Number.isFinite(timeout) || timeout < 0) {
     throw new NususError("INVALID_ARGUMENT", "timeout must be a non-negative number");
   }
 
-  return async <T>(path: string, params: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<T> => {
+  return async (path: string, params: Record<string, string | number | undefined>, signal?: AbortSignal): Promise<JsonValue> => {
     const url = new URL(path, baseUrl);
     for (const [key, value] of Object.entries(params)) {
       if (value !== undefined) url.searchParams.set(key, String(value));
@@ -54,9 +59,16 @@ export const createTransport = ({
           retryAfter: retryAfterSeconds(response.headers.get("retry-after")),
         });
       }
+      let parsed: JsonInput;
       try {
-        return (await response.json()) as T;
+        parsed = await response.json();
       } catch (cause) {
+        throw new NususError("INVALID_RESPONSE", "Turath returned invalid JSON", { url: url.href, cause });
+      }
+      try {
+        return toJsonValue(parsed);
+      } catch (cause) {
+        if (cause instanceof NususError) throw cause;
         throw new NususError("INVALID_RESPONSE", "Turath returned invalid JSON", { url: url.href, cause });
       }
     } catch (cause) {

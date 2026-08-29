@@ -17,9 +17,19 @@ import {
   getCatalogMetadata,
   listCatalogCategories,
 } from "./catalog.js";
+import {
+  decodeAuthor,
+  decodeBook,
+  decodePage,
+  decodeSearch,
+  isRecord,
+  type JsonValue,
+} from "./decode.js";
 import { boundText } from "./excerpt.js";
 import { normalizeAuthor, normalizeBook, normalizePage, normalizeSearchHit } from "./normalize.js";
-import type { RawSearch } from "./raw-types.js";
+import type { RawSearch, RawSearchHit } from "./raw-types.js";
+
+const isString = (value: JsonValue): value is string => typeof value === "string";
 
 export type RequestOptions = { signal?: AbortSignal };
 
@@ -84,8 +94,7 @@ const only = (values: TurathId[] | undefined, name: string): string | undefined 
   return id(values[0]!, name);
 };
 
-const emptyObject = (value: unknown): boolean =>
-  typeof value === "object" && value !== null && !Array.isArray(value) && Object.keys(value).length === 0;
+const isEmptyRecord = (value: JsonValue): boolean => isRecord(value) && Object.keys(value).length === 0;
 
 /** Parallel page fetches for multi-page context; bounded for large ranges. */
 const PAGE_FETCH_CONCURRENCY = 6;
@@ -95,22 +104,22 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
 
   const getAuthor = async (authorId: TurathId, { signal }: RequestOptions = {}) => {
     const author = id(authorId, "author id");
-    const raw = await request<unknown>("author", { id: author, ver: 3 }, signal);
-    if (emptyObject(raw)) throw new NususError("NOT_FOUND", `Author ${author} not found`);
-    return normalizeAuthor(raw);
+    const raw = await request("author", { id: author, ver: 3 }, signal);
+    if (isEmptyRecord(raw)) throw new NususError("NOT_FOUND", `Author ${author} not found`);
+    return normalizeAuthor(decodeAuthor(raw));
   };
 
   const getBook = async (bookId: TurathId, { signal }: RequestOptions = {}): Promise<Book> => {
     const book = id(bookId, "book id");
-    return normalizeBook(await request<unknown>("book", { id: book, include: "indexes", ver: 3 }, signal));
+    return normalizeBook(decodeBook(await request("book", { id: book, include: "indexes", ver: 3 }, signal)));
   };
 
   const getPage = async (bookId: TurathId, pageId: TurathId, { signal }: RequestOptions = {}): Promise<Passage> => {
     const book = id(bookId, "book id");
     const page = id(pageId, "page id");
-    const raw = await request<unknown>("page", { book_id: book, pg: page, ver: 3 }, signal);
-    if (emptyObject(raw)) throw new NususError("NOT_FOUND", `Book ${book}, page ${page} not found`);
-    return normalizePage(raw, book);
+    const raw = await request("page", { book_id: book, pg: page, ver: 3 }, signal);
+    if (isEmptyRecord(raw)) throw new NususError("NOT_FOUND", `Book ${book}, page ${page} not found`);
+    return normalizePage(decodePage(raw), book);
   };
 
   const fetchPagesConcurrent = async (
@@ -119,7 +128,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     signal?: AbortSignal,
   ): Promise<Passage[]> => {
     if (!pageNumbers.length) return [];
-    const results: Passage[] = new Array(pageNumbers.length);
+    const results = Array.from<Passage>({ length: pageNumbers.length });
     let cursor = 0;
     const worker = async () => {
       while (cursor < pageNumbers.length) {
@@ -146,11 +155,14 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     return fetchPagesConcurrent(book, pageNumbers, signal);
   };
 
-  const search = async (query: string, options: TurathSearchOptions = {}): Promise<SearchPage> => {
+  const searchWithRaw = async (
+    query: string,
+    options: TurathSearchOptions = {},
+  ): Promise<{ result: SearchPage; rawHits: RawSearchHit[] }> => {
     if (!query.trim()) throw new NususError("INVALID_ARGUMENT", "query must not be empty");
     const page = integer(options.page ?? 1, "page", 1);
     const run = async (effectiveQuery: string): Promise<RawSearch> => {
-      const raw = await request<unknown>(
+      const raw = await request(
         "search",
         {
           q: effectiveQuery,
@@ -163,14 +175,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
         },
         options.signal,
       );
-      if (
-        typeof raw !== "object" || raw === null ||
-        typeof (raw as RawSearch).count !== "number" ||
-        !Array.isArray((raw as RawSearch).data)
-      ) {
-        throw new NususError("INVALID_RESPONSE", "Turath returned an invalid search response");
-      }
-      return raw as RawSearch;
+      return decodeSearch(raw);
     };
 
     let effectiveQuery = query;
@@ -185,12 +190,18 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
       }
     }
     return {
-      items: response.data.map(normalizeSearchHit),
-      totalMatches: response.count,
-      page,
-      ...(effectiveQuery !== query && { effectiveQuery }),
+      result: {
+        items: response.data.map(normalizeSearchHit),
+        totalMatches: response.count,
+        page,
+        ...(effectiveQuery !== query && { effectiveQuery }),
+      },
+      rawHits: response.data,
     };
   };
+
+  const search = async (query: string, options: TurathSearchOptions = {}): Promise<SearchPage> =>
+    (await searchWithRaw(query, options)).result;
 
   const searchAll = async function* (query: string, options: Omit<TurathSearchOptions, "page"> = {}): AsyncGenerator<Passage> {
     let page = 1;
@@ -258,7 +269,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
       text: pages.map((page) => page.text).join("\n\n"),
       headings,
       segments,
-      raw: pages.map((page) => page.raw),
+      raw: pages.flatMap((page) => (page.raw === undefined ? [] : [page.raw])),
     });
   };
 
@@ -299,12 +310,15 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     const pagesBefore = integer(options.pagesBefore ?? 0, "pagesBefore");
     const pagesAfter = integer(options.pagesAfter ?? 0, "pagesAfter");
     const searchOptions = { ...options.scope, signal: options.signal };
-    const first = await search(query, searchOptions);
-    const hits = first.items.slice(0, maxPassages);
-    for (let page = 2; hits.length < Math.min(maxPassages, first.totalMatches); page += 1) {
-      const next = await search(first.effectiveQuery ?? query, { ...searchOptions, page });
-      if (!next.items.length) break;
-      hits.push(...next.items.slice(0, maxPassages - hits.length));
+    const first = await searchWithRaw(query, searchOptions);
+    const hits = first.result.items.slice(0, maxPassages);
+    const rawHits = first.rawHits.slice(0, maxPassages);
+    for (let page = 2; hits.length < Math.min(maxPassages, first.result.totalMatches); page += 1) {
+      const next = await searchWithRaw(first.result.effectiveQuery ?? query, { ...searchOptions, page });
+      if (!next.result.items.length) break;
+      const take = maxPassages - hits.length;
+      hits.push(...next.result.items.slice(0, take));
+      rawHits.push(...next.rawHits.slice(0, take));
     }
     const passages = await Promise.all(
       hits.map(async (hit, rank) => {
@@ -317,10 +331,9 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
           page = await getPage(hit.book.id, hit.location.internalPage, { signal: options.signal });
         }
 
-        const rawSnippet = typeof hit.raw === "object" && hit.raw !== null && "snip" in hit.raw &&
-            typeof hit.raw.snip === "string"
-          ? hit.raw.snip
-          : hit.snippet;
+        const rawHit = rawHits[rank];
+        const rawSnip = rawHit?.snip;
+        const rawSnippet = isString(rawSnip) ? rawSnip : hit.snippet;
         const bound = boundText(page.text, maxChars, rawSnippet);
         const segments = page.segments?.flatMap((segment) => {
           const start = Math.max(segment.start, bound.offset);
@@ -329,22 +342,22 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
         });
         const publicPage = { ...page };
         delete publicPage.raw;
-        const bounded = decoratePassage({
+        const boundedBase: Omit<Passage, "raw"> = {
           ...publicPage,
-          ...(hit.author || page.author ? { author: { ...page.author, ...hit.author } } : {}),
-          ...(hit.category
-            ? { category: { ...page.category, ...hit.category } }
-            : page.category ? { category: page.category } : {}),
           snippet: hit.snippet,
           text: bound.text,
           ...(segments && { segments }),
-        });
+        };
+        if (hit.author || page.author) boundedBase.author = { ...page.author, ...hit.author };
+        if (hit.category) boundedBase.category = { ...page.category, ...hit.category };
+        else if (page.category) boundedBase.category = page.category;
+        const bounded = decoratePassage(boundedBase);
         const provenance: PassageProvenance = {
           query,
-          ...(first.effectiveQuery && { effectiveQuery: first.effectiveQuery }),
+          ...(first.result.effectiveQuery && { effectiveQuery: first.result.effectiveQuery }),
           ...(options.scope && { scope: options.scope }),
           rank,
-          totalMatches: first.totalMatches,
+          totalMatches: first.result.totalMatches,
           truncated: bound.truncated,
           ...(bound.truncation && { truncation: bound.truncation }),
           contextPages: { before: pagesBefore, after: pagesAfter },
@@ -355,9 +368,9 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     );
     return {
       passages,
-      totalMatches: first.totalMatches,
+      totalMatches: first.result.totalMatches,
       query,
-      ...(first.effectiveQuery && { effectiveQuery: first.effectiveQuery }),
+      ...(first.result.effectiveQuery && { effectiveQuery: first.result.effectiveQuery }),
     };
   };
 

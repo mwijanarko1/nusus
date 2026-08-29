@@ -29,7 +29,9 @@ export const getLocator = (source: CitationSource): SourceLocator => ({
 });
 
 export const formatCitation = (source: CitationSource): string => {
-  const parts = [source.author?.name, source.book.title].filter(Boolean) as string[];
+  const parts: string[] = [];
+  if (source.author?.name) parts.push(source.author.name);
+  if (source.book.title) parts.push(source.book.title);
   if (source.location.volume) parts.push(`ج ${source.location.volume}`);
   if (source.location.printedPage !== undefined) parts.push(`ص ${source.location.printedPage}`);
   if (source.location.internalPage !== undefined) parts.push(`صفحة تراث ${source.location.internalPage}`);
@@ -44,9 +46,18 @@ type DecoratedPassage<T extends CitationSource> = Omit<T, "alternateUrls" | "cit
   locator: SourceLocator;
 };
 
+type DecorationExtras = {
+  alternateUrls?: AlternateUrls;
+  citation?: string;
+  url?: string;
+  locator?: SourceLocator;
+};
+
 /** Canonical citation/url/locator decoration for passages and passage-like records. */
-export const decoratePassage = <T extends CitationSource>(source: T): DecoratedPassage<T> => {
-  const { alternateUrls: _alternateUrls, ...passage } = source as T & { alternateUrls?: AlternateUrls };
+export const decoratePassage = <T extends CitationSource>(
+  source: T & DecorationExtras,
+): DecoratedPassage<T> => {
+  const { alternateUrls: _alternateUrls, citation: _citation, url: _url, locator: _locator, ...passage } = source;
   const alternateUrls = getAlternateUrls(source);
   return {
     ...passage,
@@ -54,5 +65,5 @@ export const decoratePassage = <T extends CitationSource>(source: T): DecoratedP
     url: getSourceUrl(source),
     ...(alternateUrls && { alternateUrls }),
     locator: getLocator(source),
-  } as DecoratedPassage<T>;
+  };
 };

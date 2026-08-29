@@ -1,6 +1,6 @@
 {
   "name": "nusus",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "TypeScript SDK and agent CLI for searching and citing classical Islamic and Arabic texts via Turath",
   "keywords": [
     "turath",
@@ -43,6 +43,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "lint": "oxlint",
     "prepack": "npm run build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "bun test ./tests",
@@ -51,6 +52,8 @@
     "catalog:books": "bun scripts/refresh-catalog.mjs books"
   },
   "devDependencies": {
+    "@oxlint/plugins": "1.79.0",
+    "oxlint": "1.79.0",
     "typescript": "^7.0.2"
   },
   "engines": {

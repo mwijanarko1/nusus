@@ -6,10 +6,27 @@ import { tmpdir } from "node:os";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+const isJsonObject = (value: JsonValue): value is { [key: string]: JsonValue } =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const jsonObject = (value: JsonValue): { [key: string]: JsonValue } => {
+  if (!isJsonObject(value)) throw new Error("expected a JSON object");
+  return value;
+};
+
+const jsonArray = (value: JsonValue): JsonValue[] => {
+  if (!Array.isArray(value)) throw new Error("expected a JSON array");
+  return value;
+};
+
+const isStringValue = (value: JsonValue): value is string => typeof value === "string";
+
 const mcpRoot = path.resolve(import.meta.dir, "..");
 const root = path.resolve(mcpRoot, "..");
 const serverEntry = path.join(mcpRoot, "dist/index.js");
-const manifest = JSON.parse(readFileSync(path.join(mcpRoot, "package.json"), "utf8")) as { version: string };
+const manifest = jsonObject(JSON.parse(readFileSync(path.join(mcpRoot, "package.json"), "utf8")));
 const fixture = (name: string) => Bun.file(path.join(root, "tests/fixtures", `${name}.json`)).json();
 const [page, search] = await Promise.all([fixture("page-147927-5"), fixture("search-book-147927")]);
 const upstream = Bun.serve({
@@ -18,8 +35,8 @@ const upstream = Bun.serve({
     const url = new URL(request.url);
     if (url.pathname.endsWith("/search")) return Response.json(search);
     if (url.pathname.endsWith("/page")) {
-      const body = structuredClone(page) as { meta: string; text: string };
-      const meta = JSON.parse(body.meta) as Record<string, unknown>;
+      const body = structuredClone(page);
+      const meta = jsonObject(JSON.parse(body.meta));
       const pageId = Number(url.searchParams.get("pg"));
       meta.page_id = pageId;
       meta.page = pageId;
@@ -51,9 +68,6 @@ const connectClient = async (options?: ConstructorParameters<typeof Client>[1]) 
 };
 
 beforeAll(async () => {
-  const rootBuild = spawnSync("bun", ["run", "build"], { cwd: root, encoding: "utf8" });
-  if (rootBuild.status !== 0) throw new Error(`Build failed in ${root}:\n${rootBuild.stdout}\n${rootBuild.stderr}`);
-
   packageDirectory = mkdtempSync(path.join(tmpdir(), "nusus-mcp-test-"));
   const packed = spawnSync("npm", ["pack", root, "--pack-destination", packageDirectory], { cwd: root, encoding: "utf8" });
   if (packed.status !== 0) throw new Error(`npm pack failed:\n${packed.stdout}\n${packed.stderr}`);
@@ -100,9 +114,10 @@ describe("nusus-mcp stdio server", () => {
     const content = result.content[0];
     expect(content?.type).toBe("text");
     if (content?.type !== "text") throw new Error("Expected text tool content");
-    const books = JSON.parse(content.text) as Array<{ id: string; title: string }>;
+    const books = jsonArray(JSON.parse(content.text));
     expect(books.length).toBeGreaterThan(0);
-    expect(books[0]?.title).toContain("الأربعون");
+    const first = jsonObject(books[0]);
+    expect(isStringValue(first.title) ? first.title : "").toContain("الأربعون");
   });
 
   test("returns primary Turath and alternate Shamela URLs for passage output", async () => {
@@ -113,10 +128,8 @@ describe("nusus-mcp stdio server", () => {
     expect(result.isError).not.toBe(true);
     const content = result.content[0];
     if (content?.type !== "text") throw new Error("Expected text tool content");
-    const response = JSON.parse(content.text) as {
-      passages: Array<{ provider: string; url: string; alternateUrls: { shamela: string } }>;
-    };
-    expect(response.passages[0]).toMatchObject({
+    const response = jsonObject(JSON.parse(content.text));
+    expect(jsonArray(response.passages)[0]).toMatchObject({
       provider: "turath",
       url: "https://app.turath.io/book/147927?page=25",
       alternateUrls: { shamela: "https://shamela.ws/book/147927/25" },
@@ -133,12 +146,13 @@ describe("nusus-mcp stdio server", () => {
     expect(result.isError).not.toBe(true);
     const content = result.content[0];
     if (content?.type !== "text") throw new Error("Expected text tool content");
-    expect((JSON.parse(content.text) as unknown[]).length).toBeGreaterThan(0);
+    expect(jsonArray(JSON.parse(content.text)).length).toBeGreaterThan(0);
   });
 
   test("keeps manifest and server versions aligned", () => {
-    expect(legacyClient.getServerVersion()?.version).toBe(manifest.version);
-    expect(modernClient.getServerVersion()?.version).toBe(manifest.version);
+    const version = isStringValue(manifest.version) ? manifest.version : "";
+    expect(legacyClient.getServerVersion()?.version).toBe(version);
+    expect(modernClient.getServerVersion()?.version).toBe(version);
   });
 
   test("maps Nusus errors to MCP tool errors", async () => {
@@ -146,7 +160,7 @@ describe("nusus-mcp stdio server", () => {
     expect(result.isError).toBe(true);
     const content = result.content[0];
     if (content?.type !== "text") throw new Error("Expected text tool content");
-    expect(JSON.parse(content.text)).toEqual({
+    expect(jsonObject(JSON.parse(content.text))).toEqual({
       code: "INVALID_ARGUMENT",
       message: "query must not be empty unless authorIds or categoryIds are set",
     });

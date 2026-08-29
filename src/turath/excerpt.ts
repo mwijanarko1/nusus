@@ -1,5 +1,14 @@
 /** Pure match-window excerpting for retrieve(); no transport/catalog deps. */
 
+type FoldedText = { folded: string; map: number[] };
+type TextWindow = { text: string; offset: number };
+type BoundedText = {
+  text: string;
+  offset: number;
+  truncated: boolean;
+  truncation?: "prefix" | "match-window";
+};
+
 const stripTags = (value: string): string => value.replace(/<[^>]*>/g, "");
 
 export const safeSlice = (text: string, start: number, end: number): string => {
@@ -19,11 +28,11 @@ export const truncatePrefix = (text: string, maxChars: number): string => {
 const cleanNeedle = (value: string): string =>
   value
     .replace(/\s+/g, " ")
-    .replace(/^[‏‎\s\[\](){}<>«»"'`،,.:;!?…]+|[‏‎\s\[\](){}<>«»"'`،,.:;!?…]+$/g, "")
+    .replace(/^[‏‎\s[\](){}<>«»"'`،,.:;!?…]+|[‏‎\s[\](){}<>«»"'`،,.:;!?…]+$/g, "")
     .trim();
 
 /** Collapse whitespace while mapping each folded index back to a raw code-unit index. */
-export const foldWhitespace = (text: string): { folded: string; map: number[] } => {
+export const foldWhitespace = (text: string): FoldedText => {
   const map: number[] = [];
   let folded = "";
   let lastWasSpace = true;
@@ -117,7 +126,7 @@ export const windowAround = (
   matchIndex: number,
   matchLength: number,
   maxChars: number,
-): { text: string; offset: number } => {
+): TextWindow => {
   if (maxChars <= 0) return { text: "", offset: 0 };
 
   let start = matchIndex;
@@ -136,7 +145,7 @@ export const boundText = (
   text: string,
   maxChars: number,
   snippet?: string,
-): { text: string; offset: number; truncated: boolean; truncation?: "prefix" | "match-window" } => {
+): BoundedText => {
   if (text.length <= maxChars) return { text, offset: 0, truncated: false };
 
   // Prefer earlier needles (em terms first), then longer located spans.

@@ -19,6 +19,31 @@ const catalogDataPath = resolve(root, "src/turath/catalog-data.ts");
 const defaultResume = resolve(root, ".cache/catalog-authors-progress.json");
 const baseUrl = "https://api.turath.io/";
 
+const isString = (value) => Object.prototype.toString.call(value) === "[object String]";
+const isENOENT = (error) => error instanceof Error && error.code === "ENOENT";
+const hasOwn = (record, key) => Object.prototype.hasOwnProperty.call(record, key);
+
+const isPlainRecord = (value) => {
+  if (value === null || Array.isArray(value)) return false;
+  if (Object.prototype.toString.call(value) !== "[object Object]") return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+};
+
+const copyOwnProperties = (target, source) => {
+  for (const key of Object.keys(source)) {
+    const descriptor = Object.getOwnPropertyDescriptor(source, key);
+    if (descriptor === undefined) continue;
+    Object.defineProperty(target, key, {
+      value: descriptor.value,
+      writable: true,
+      enumerable: true,
+      configurable: true,
+    });
+  }
+  return target;
+};
+
 export const usage = () => {
   console.error(`Usage:
   bun scripts/refresh-catalog.mjs books
@@ -65,18 +90,18 @@ export const loadExistingAuthors = async () => {
     const { CATALOG_AUTHORS } = await import(`${pathToFileURL(authorsOut).href}?t=${Date.now()}`);
     const names = {};
     for (const [id, name] of CATALOG_AUTHORS) {
-      if (Number.isInteger(id) && id > 0 && typeof name === "string" && name.trim()) {
+      if (Number.isInteger(id) && id > 0 && isString(name) && name.trim()) {
         names[String(id)] = name;
       }
     }
     return names;
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") return {};
+    if (isENOENT(error)) return {};
     // Missing module during first hydrate is fine; other import failures should surface.
     try {
       await readFile(authorsOut);
     } catch (readError) {
-      if (readError && typeof readError === "object" && "code" in readError && readError.code === "ENOENT") return {};
+      if (isENOENT(readError)) return {};
     }
     throw error;
   }
@@ -86,20 +111,21 @@ export const loadProgress = async (path) => {
   const existing = await loadExistingAuthors();
   try {
     const raw = JSON.parse(await readFile(path, "utf8"));
-    if (!raw || typeof raw !== "object") throw new Error("invalid progress file");
-    const names = { ...existing, ...(raw.names && typeof raw.names === "object" ? raw.names : {}) };
+    if (!isPlainRecord(raw)) throw new Error("invalid progress file");
+    const names = { ...existing };
+    if (hasOwn(raw, "names") && isPlainRecord(raw.names)) copyOwnProperties(names, raw.names);
     const completed = new Set([
       ...Object.keys(names).map(Number),
-      ...(Array.isArray(raw.completed) ? raw.completed.map(Number) : []),
+      ...(hasOwn(raw, "completed") && Array.isArray(raw.completed) ? raw.completed.map(Number) : []),
     ]);
     return {
       completed: [...completed],
       names,
-      missing: Array.isArray(raw.missing) ? raw.missing.map(Number) : [],
-      errors: raw.errors && typeof raw.errors === "object" ? { ...raw.errors } : {},
+      missing: hasOwn(raw, "missing") && Array.isArray(raw.missing) ? raw.missing.map(Number) : [],
+      errors: hasOwn(raw, "errors") && isPlainRecord(raw.errors) ? copyOwnProperties({}, raw.errors) : {},
     };
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+    if (isENOENT(error)) {
       return {
         completed: Object.keys(existing).map(Number),
         names: existing,
@@ -130,7 +156,7 @@ export const buildAuthorsModule = (names, catalogIds, { missing = 0 } = {}) => {
     requested > 0 && resolved + missing >= requested
       ? `// Coverage: ${resolved} verified names for ${requested} known catalog author IDs` +
         (missing ? ` (${missing} official empty/NOT_FOUND, not fabricated).` : ".")
-      : `// Partial map — resume with: bun scripts/refresh-catalog.mjs authors`;
+      : `// Partial map - resume with: bun scripts/refresh-catalog.mjs authors`;
   const source = `// Verified author names from official GET /author only.
 ${coverage}
 // Tuple: [author id, Arabic name].
@@ -170,10 +196,10 @@ const fetchAuthor = async (authorId, attempt = 0) => {
     throw new Error(`HTTP ${response.status}`);
   }
   const body = await response.json();
-  if (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length === 0) {
+  if (!isPlainRecord(body) || Object.keys(body).length === 0) {
     return { missing: true };
   }
-  if (typeof body.id !== "number" || typeof body.name !== "string" || !body.name.trim()) {
+  if (!hasOwn(body, "id") || !Number.isFinite(body.id) || !hasOwn(body, "name") || !isString(body.name) || !body.name.trim()) {
     throw new Error("invalid author payload");
   }
   return { id: body.id, name: body.name };

@@ -2,7 +2,14 @@
 import { Server, type Tool } from "@modelcontextprotocol/server";
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
 import { NususError } from "nusus";
+import type { Author, Book, Passage, RetrievedContext } from "nusus";
 import { createTurathClient } from "nusus/turath";
+
+type JsonInput = string | number | boolean | null | JsonInput[] | { [key: string]: JsonInput };
+
+const isInteger = (value: JsonInput): value is number =>
+  typeof value === "number" && Number.isInteger(value);
+const isString = (value: JsonInput): value is string => typeof value === "string";
 
 declare const process: {
   env: Record<string, string | undefined>;
@@ -10,30 +17,46 @@ declare const process: {
   exitCode?: number;
 };
 
-type Arguments = Record<string, unknown>;
-
-const positiveInteger = (args: Arguments, key: string, required = false): number | undefined => {
-  const value = args[key];
-  if (value === undefined && !required) return undefined;
-  if (!Number.isInteger(value) || (value as number) < 1) throw new NususError("INVALID_ARGUMENT", `${key} must be a positive integer`);
-  return value as number;
+type Arguments = {
+  query?: JsonInput;
+  bookId?: JsonInput;
+  authorId?: JsonInput;
+  categoryId?: JsonInput;
+  limit?: JsonInput;
+  maxPassages?: JsonInput;
+  maxCharsPerPassage?: JsonInput;
+  pagesBefore?: JsonInput;
+  pagesAfter?: JsonInput;
+  pageId?: JsonInput;
 };
 
-const nonNegativeInteger = (args: Arguments, key: string): number | undefined => {
+type ArgumentKey = keyof Arguments;
+
+const positiveInteger = (args: Arguments, key: ArgumentKey): number | undefined => {
   const value = args[key];
   if (value === undefined) return undefined;
-  if (!Number.isInteger(value) || (value as number) < 0) throw new NususError("INVALID_ARGUMENT", `${key} must be a non-negative integer`);
-  return value as number;
-};
-
-const stringArgument = (args: Arguments, key: string): string => {
-  const value = args[key];
-  if (typeof value !== "string") throw new NususError("INVALID_ARGUMENT", `${key} must be a string`);
+  if (!isInteger(value) || value < 1) throw new NususError("INVALID_ARGUMENT", `${key} must be a positive integer`);
   return value;
 };
 
-const optional = <T extends Record<string, unknown>>(values: T): T =>
-  Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as T;
+const requiredPositiveInteger = (args: Arguments, key: ArgumentKey): number => {
+  const value = positiveInteger(args, key);
+  if (value === undefined) throw new NususError("INVALID_ARGUMENT", `${key} must be a positive integer`);
+  return value;
+};
+
+const nonNegativeInteger = (args: Arguments, key: ArgumentKey): number | undefined => {
+  const value = args[key];
+  if (value === undefined) return undefined;
+  if (!isInteger(value) || value < 0) throw new NususError("INVALID_ARGUMENT", `${key} must be a non-negative integer`);
+  return value;
+};
+
+const stringArgument = (args: Arguments, key: ArgumentKey): string => {
+  const value = args[key];
+  if (value === undefined || !isString(value)) throw new NususError("INVALID_ARGUMENT", `${key} must be a string`);
+  return value;
+};
 
 const baseUrl = process.env.NUSUS_TURATH_BASE_URL;
 const turath = createTurathClient(baseUrl ? { baseUrl } : {});
@@ -113,7 +136,10 @@ const tools: Tool[] = [
   },
 ];
 
-const jsonContent = (value: unknown, isError = false) => ({
+type ToolResult = Book | Author | RetrievedContext | Passage;
+type Jsonable = ToolResult | ToolResult[] | { code: string; message: string };
+
+const jsonContent = (value: Jsonable, isError = false) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value, (key, item) => key === "raw" ? undefined : item) }],
   ...(isError && { isError: true }),
 });
@@ -123,42 +149,41 @@ const runTool = async (name: string, args: Arguments) => {
     case "find_books": {
       const authorId = positiveInteger(args, "authorId");
       const categoryId = positiveInteger(args, "categoryId");
-      return turath.findBooks(stringArgument(args, "query"), optional({
+      return turath.findBooks(stringArgument(args, "query"), {
         authorIds: authorId === undefined ? undefined : [authorId],
         categoryIds: categoryId === undefined ? undefined : [categoryId],
         limit: positiveInteger(args, "limit"),
-      }));
+      });
     }
     case "find_authors":
-      return turath.findAuthors(stringArgument(args, "query"), optional({ limit: positiveInteger(args, "limit") }));
+      return turath.findAuthors(stringArgument(args, "query"), { limit: positiveInteger(args, "limit") });
     case "retrieve": {
       const bookId = positiveInteger(args, "bookId");
       const authorId = positiveInteger(args, "authorId");
       const categoryId = positiveInteger(args, "categoryId");
-      const scope = optional({
-        bookIds: bookId === undefined ? undefined : [bookId],
-        authorIds: authorId === undefined ? undefined : [authorId],
-        categoryIds: categoryId === undefined ? undefined : [categoryId],
-      });
-      return turath.retrieve(stringArgument(args, "query"), optional({
-        scope: Object.keys(scope).length ? scope : undefined,
+      const bookIds = bookId === undefined ? undefined : [bookId];
+      const authorIds = authorId === undefined ? undefined : [authorId];
+      const categoryIds = categoryId === undefined ? undefined : [categoryId];
+      const scope = bookIds || authorIds || categoryIds ? { bookIds, authorIds, categoryIds } : undefined;
+      return turath.retrieve(stringArgument(args, "query"), {
+        scope,
         maxPassages: positiveInteger(args, "maxPassages"),
         maxCharsPerPassage: positiveInteger(args, "maxCharsPerPassage"),
         pagesBefore: nonNegativeInteger(args, "pagesBefore"),
         pagesAfter: nonNegativeInteger(args, "pagesAfter"),
-      }));
+      });
     }
     case "get_context":
       return turath.getContextByPage(
-        positiveInteger(args, "bookId", true)!,
-        positiveInteger(args, "pageId", true)!,
-        optional({
+        requiredPositiveInteger(args, "bookId"),
+        requiredPositiveInteger(args, "pageId"),
+        {
           pagesBefore: nonNegativeInteger(args, "pagesBefore"),
           pagesAfter: nonNegativeInteger(args, "pagesAfter"),
-        }),
+        },
       );
     case "get_book":
-      return turath.getBook(positiveInteger(args, "bookId", true)!);
+      return turath.getBook(requiredPositiveInteger(args, "bookId"));
     default:
       throw new NususError("INVALID_ARGUMENT", `Unknown tool: ${name}`);
   }

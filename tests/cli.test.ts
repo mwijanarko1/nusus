@@ -7,7 +7,7 @@ import { createRequire } from "node:module";
 const root = path.resolve(import.meta.dir, "..");
 const cli = path.join(root, "scripts/search.mjs");
 const distDir = path.join(root, "dist");
-const packageVersion = createRequire(import.meta.url)(path.join(root, "package.json")).version as string;
+const packageVersion = createRequire(import.meta.url)(path.join(root, "package.json")).version;
 const fixture = (name: string) => Bun.file(path.join(root, "tests/fixtures", `${name}.json`)).json();
 
 /** Packaged bin imports ../dist; fresh clones have no committed dist. */
@@ -53,8 +53,8 @@ const server = Bun.serve({
       const bookId = url.searchParams.get("book_id");
       const pg = url.searchParams.get("pg");
       if (bookId === "147927" && pg && /^[1-9]\d*$/.test(pg)) {
-        const body = structuredClone(page) as { meta: string; text: string };
-        const meta = JSON.parse(body.meta) as Record<string, unknown>;
+        const body = structuredClone(page);
+        const meta = objectLine(JSON.parse(body.meta));
         meta.page_id = Number(pg);
         meta.page = Number(pg);
         body.meta = JSON.stringify(meta);
@@ -75,7 +75,9 @@ afterAll(() => {
   server.stop(true);
 });
 
-type RunResult = { code: number; stdout: string; stderr: string; lines: Record<string, unknown>[] };
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+
+type RunResult = { code: number; stdout: string; stderr: string; lines: { [key: string]: JsonValue }[] };
 
 const run = (
   args: string[],
@@ -110,15 +112,53 @@ const run = (
         ? stdout
             .split("\n")
             .filter(Boolean)
-            .map((line) => JSON.parse(line) as Record<string, unknown>)
+            .map((line) => objectLine(JSON.parse(line)))
         : [];
       resolve({ code: code ?? 1, stdout, stderr, lines });
     });
   });
 
+const isJsonValue = (value: JsonValue): value is JsonValue => {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.every(isJsonValue);
+  if (typeof value === "object") {
+    for (const v of Object.values(value)) {
+      if (!isJsonValue(v)) return false;
+    }
+    return true;
+  }
+  return false;
+};
+
+const isObjectLine = (value: JsonValue): value is { [key: string]: JsonValue } =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const objectLine = (value: JsonValue): { [key: string]: JsonValue } => {
+  if (!isJsonValue(value) || !isObjectLine(value)) throw new Error("CLI JSON line must be an object");
+  return value;
+};
+
+const isStringValue = (value: JsonValue): value is string => typeof value === "string";
+const isNumberValue = (value: JsonValue): value is number => typeof value === "number";
+
+const asArray = (value: JsonValue): JsonValue[] => {
+  if (!Array.isArray(value)) throw new Error("expected a JSON array");
+  return value;
+};
+
 const stderrError = (stderr: string) => {
   const line = stderr.trim().split("\n").at(-1) ?? "";
-  return JSON.parse(line) as { ok: false; error: { code: string; message: string } };
+  const parsed = objectLine(JSON.parse(line));
+  const error = parsed.error;
+  if (!isObjectLine(error)) throw new Error("CLI error line must carry an error object");
+  return {
+    ok: false,
+    error: {
+      code: isStringValue(error.code) ? error.code : "",
+      message: isStringValue(error.message) ? error.message : "",
+      retryAfter: isNumberValue(error.retryAfter) ? error.retryAfter : undefined,
+    },
+  };
 };
 
 describe("nusus CLI", () => {
@@ -180,24 +220,15 @@ describe("nusus CLI", () => {
       pagesAfter: 0,
       bookIds: ["147927"],
     });
-    const passage = result.lines[1] as {
-      type: string;
-      provider: string;
-      citation: string;
-      url: string;
-      alternateUrls: { shamela: string };
-      headings: string[];
-      text: string;
-      book: { id: string };
-    };
+    const passage = objectLine(result.lines[1]);
     expect(passage.type).toBe("passage");
     expect(passage.provider).toBe("turath");
-    expect(passage.book.id).toBe("147927");
-    expect(passage.citation).toContain("تراث");
-    expect(passage.url).toContain("https://app.turath.io/book/147927");
+    expect(objectLine(passage.book).id).toBe("147927");
+    expect(String(passage.citation)).toContain("تراث");
+    expect(String(passage.url)).toContain("https://app.turath.io/book/147927");
     expect(passage.alternateUrls).toEqual({ shamela: "https://shamela.ws/book/147927/25" });
     expect(Array.isArray(passage.headings)).toBe(true);
-    expect(passage.text.length).toBeGreaterThan(0);
+    expect(String(passage.text).length).toBeGreaterThan(0);
   });
 
   test("search accepts single filter and combined filters", async () => {
@@ -294,7 +325,7 @@ describe("nusus CLI", () => {
       expect(rate.code).toBe(3);
       const err = stderrError(rate.stderr);
       expect(err.error.code).toBe("RATE_LIMITED");
-      expect((err.error as { retryAfter?: number }).retryAfter).toBe(7);
+      expect(err.error.retryAfter).toBe(7);
     } finally {
       errServer.stop(true);
     }
@@ -354,7 +385,12 @@ describe("nusus CLI", () => {
       authorIds: ["44"],
       returned: expect.any(Number),
     });
-    expect(byAuthor.lines.slice(1).every((line) => (line.author as { id?: string } | undefined)?.id === "44")).toBe(true);
+    expect(
+      byAuthor.lines.slice(1).every((value) => {
+        const line = objectLine(value);
+        return isObjectLine(line.author) && line.author.id === "44";
+      }),
+    ).toBe(true);
 
     const empty = await run(["find-books", "xyzzy-no-such-book"], {
       NUSUS_TURATH_BASE_URL: "http://127.0.0.1:1",
@@ -408,16 +444,12 @@ describe("nusus CLI", () => {
   test("get-book includes toc from SDK-normalized indexes", async () => {
     const result = await run(["get-book", "147927"]);
     expect(result.code).toBe(0);
-    const record = result.lines[0] as {
-      type: string;
-      id: string;
-      toc?: { title: string; level?: number; page?: number }[];
-      volumes?: string[];
-    };
+    const record = objectLine(result.lines[0]);
     expect(record.type).toBe("book");
     expect(record.id).toBe("147927");
-    expect(record.toc?.length).toBeGreaterThan(0);
-    expect(record.toc?.[0]).toMatchObject({ title: "تقديم مصطفى العدوي", level: 1, page: 2 });
+    const toc = asArray(record.toc);
+    expect(toc.length).toBeGreaterThan(0);
+    expect(objectLine(toc[0])).toMatchObject({ title: "تقديم مصطفى العدوي", level: 1, page: 2 });
     expect(record.volumes).toEqual(["1"]);
   });
 
@@ -447,15 +479,15 @@ describe("nusus CLI", () => {
       book: { id: "147927" },
       alternateUrls: { shamela: "https://shamela.ws/book/147927/5" },
     });
-    const contextSegments = (contextResult.lines[0] as { segments: { alternateUrls: { shamela: string } }[] }).segments;
+    const contextSegments = asArray(objectLine(contextResult.lines[0]).segments);
     expect(contextSegments).toHaveLength(3);
-    expect(contextSegments.map((segment) => segment.alternateUrls.shamela)).toEqual([
-      "https://shamela.ws/book/147927/4",
-      "https://shamela.ws/book/147927/5",
-      "https://shamela.ws/book/147927/6",
+    expect(contextSegments.map((segment) => objectLine(segment).alternateUrls)).toEqual([
+      { shamela: "https://shamela.ws/book/147927/4" },
+      { shamela: "https://shamela.ws/book/147927/5" },
+      { shamela: "https://shamela.ws/book/147927/6" },
     ]);
-    expect(String((contextResult.lines[0] as { text: string }).text).length).toBeGreaterThan(
-      String((pageResult.lines[0] as { text: string }).text).length,
+    expect(String(objectLine(contextResult.lines[0]).text).length).toBeGreaterThan(
+      String(objectLine(pageResult.lines[0]).text).length,
     );
 
     const authorResult = await run(["get-author", "44"]);
@@ -494,16 +526,12 @@ describe("nusus CLI", () => {
       returned: expect.any(Number),
     });
     expect(tocResult.lines.some((line) => line.type === "toc-entry")).toBe(true);
-    const firstEntry = tocResult.lines.find((line) => line.type === "toc-entry") as {
-      type: string;
-      title: string;
-      bookId: string;
-      page?: number;
-      level?: number;
-    };
-    expect(firstEntry.title).toContain("الحديث الأول");
-    expect(firstEntry.bookId).toBe("147927");
-    expect(firstEntry.page).toBeGreaterThan(0);
+    const firstEntry = tocResult.lines.find((line) => line.type === "toc-entry");
+    const entry = firstEntry === undefined ? undefined : objectLine(firstEntry);
+    expect(entry).toBeDefined();
+    expect(String(entry?.title)).toContain("الحديث الأول");
+    expect(entry?.bookId).toBe("147927");
+    expect(entry && isNumberValue(entry.page) ? entry.page : -1).toBeGreaterThan(0);
   });
 
   test("get-pages rejects span over 20 with exit 1", async () => {
@@ -607,8 +635,8 @@ describe("nusus CLI", () => {
       });
     });
     expect(result.code).toBe(0);
-    const payload = JSON.parse(result.stdout) as { code: number | null; err: string };
+    const payload = objectLine(JSON.parse(result.stdout));
     expect(payload.code).toBe(0);
-    expect(payload.err).not.toMatch(/EPIPE|Unhandled|stack/i);
+    expect(String(payload.err)).not.toMatch(/EPIPE|Unhandled|stack/i);
   });
 });

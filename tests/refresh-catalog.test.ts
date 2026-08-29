@@ -6,6 +6,7 @@ import {
   buildAuthorsModule,
   clearResolvedError,
   loadCatalogAuthorIds,
+  loadProgress,
   parseArgs,
 } from "../scripts/refresh-catalog.mjs";
 
@@ -67,5 +68,43 @@ describe("refresh-catalog helpers", () => {
     await writeFile(progress, JSON.stringify({ names: {}, completed: [], missing: [], errors: {} }));
     const opts = parseArgs(["--resume", progress, "--delay-ms", "0", "--limit", "1"]);
     expect(opts.resume).toBe(progress);
+  });
+
+  test("loadProgress rejects arrays and non-records as invalid progress", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "nusus-refresh-"));
+    for (const [label, payload] of [
+      ["array", JSON.stringify([1, 2, 3])],
+      ["number", JSON.stringify(42)],
+      ["string", JSON.stringify("hello")],
+      ["null", JSON.stringify(null)],
+    ]) {
+      const progress = join(dir, `${label}.json`);
+      await writeFile(progress, payload);
+      await expect(loadProgress(progress)).rejects.toThrow(/invalid progress file/);
+    }
+  });
+
+  test("loadProgress preserves an own __proto__ key in names without prototype mutation", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "nusus-refresh-"));
+    const progress = join(dir, "proto.json");
+    const payload = `{"names":{"__proto__":{"marker":1},"44":"النووي"},"completed":[44],"missing":[],"errors":{}}`;
+    await writeFile(progress, payload);
+    const result = await loadProgress(progress);
+    expect(Object.getPrototypeOf(result.names)).toBe(Object.prototype);
+    expect(Object.prototype.hasOwnProperty.call(result.names, "__proto__")).toBe(true);
+    expect(result.names["__proto__"]).toEqual({ marker: 1 });
+    expect(result.names["44"]).toBe("النووي");
+    expect(result.completed).toContain(44);
+  });
+
+  test("loadProgress defaults missing sections without picking up inherited values", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "nusus-refresh-"));
+    const progress = join(dir, "empty.json");
+    await writeFile(progress, JSON.stringify({}));
+    const result = await loadProgress(progress);
+    expect(result.missing).toEqual([]);
+    expect(result.errors).toEqual({});
+    const existingKeys = Object.keys(result.names).map(Number).sort((a, b) => a - b);
+    expect(result.completed.slice().sort((a, b) => a - b)).toEqual(existingKeys);
   });
 });

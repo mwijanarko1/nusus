@@ -43,6 +43,14 @@ describe("citations and locators", () => {
     expect(citation).toBe("كتاب، صفحة تراث 3، تراث 99");
   });
 
+  test("citation omits an empty book title", () => {
+    const citation = formatCitation({
+      book: { id: "99", title: "" },
+      location: { internalPage: 3 },
+    });
+    expect(citation).toBe("صفحة تراث 3، تراث 99");
+  });
+
   test("decoratePassage derives alternate URLs and removes stale input when no internal page exists", () => {
     const decorated = decoratePassage({
       provider: "turath" as const,

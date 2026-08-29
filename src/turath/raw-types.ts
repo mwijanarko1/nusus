@@ -1,42 +1,33 @@
+import type { JsonValue } from "./json.js";
+
 export type RawAuthor = {
   id: number;
   name: string;
-  biography?: string;
-  death?: string;
-  [key: string]: unknown;
+  [key: string]: JsonValue;
 };
+
+export type RawBookMeta = {
+  id: number;
+  name: string;
+  [key: string]: JsonValue;
+};
+
+export type RawBookIndexes = { [key: string]: JsonValue };
 
 export type RawBook = {
-  meta: {
-    id: number;
-    name: string;
-    author_id?: number;
-    cat_id?: number;
-    info?: string;
-    pdf_links?: unknown;
-    [key: string]: unknown;
-  };
-  indexes?: Record<string, unknown>;
+  meta: RawBookMeta;
+  [key: string]: JsonValue;
 };
 
-export type RawPageMeta = {
-  headings?: string[];
-  page_id?: number;
-  page?: number;
-  vol?: string;
-  book_name?: string;
-  author_name?: string;
-};
+export type RawPageMeta = { [key: string]: JsonValue };
 
-export type RawPage = { meta: string; text: string };
+export type RawPage = { meta: string; text: string; [key: string]: JsonValue };
 
 export type RawSearchHit = {
-  author_id?: number;
   book_id: number;
-  cat_id?: number;
   meta: string;
-  snip?: string;
   text: string;
+  [key: string]: JsonValue;
 };
 
-export type RawSearch = { count: number; data: RawSearchHit[] };
+export type RawSearch = { count: number; data: RawSearchHit[]; [key: string]: JsonValue };
