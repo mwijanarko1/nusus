@@ -1,6 +1,6 @@
 {
   "name": "nusus-mcp",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Local MCP stdio server for Nusus and Turath",
   "keywords": [
     "turath",
@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/server": "^2.0.0",
-    "nusus": "^0.7.1"
+    "nusus": "^0.7.2"
   },
   "engines": {
     "node": ">=20"

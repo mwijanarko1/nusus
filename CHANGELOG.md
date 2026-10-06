@@ -11,6 +11,42 @@ messages.
 
 ## Unreleased
 
+## nusus 0.7.2 - 2026-09-05
+
+### Added
+
+- Add package and authentication dry-run scripts for release checks.
+
+### Fixed
+
+- Deduplicate page-fetch promises within each retrieval so overlapping contexts
+  fetch each unique book page once while preserving passage content, segments,
+  and citations.
+
+## nusus-mcp 0.2.2 - 2026-09-05
+
+### Changed
+
+- Depend on `nusus ^0.7.2` so MCP retrievals inherit page-fetch
+  deduplication, and synchronize the advertised server version.
+
+## nusus 0.7.1 - 2026-08-29
+
+### Changed
+
+- Add strict Oxlint checks for unsafe TypeScript patterns.
+
+### Fixed
+
+- Harden decoding and normalization of Turath responses against malformed JSON,
+  invalid optional fields, and prototype-based input attacks.
+
+## nusus-mcp 0.2.1 - 2026-08-29
+
+### Changed
+
+- Depend on `nusus ^0.7.1` and tighten MCP argument and response typing.
+
 ## nusus 0.7.0 - 2026-08-09
 
 ### Added

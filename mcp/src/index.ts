@@ -191,7 +191,7 @@ const runTool = async (name: string, args: Arguments) => {
 
 const createServer = () => {
   const server = new Server(
-    { name: "nusus-mcp", version: "0.2.0" },
+    { name: "nusus-mcp", version: "0.2.2" },
     { capabilities: { tools: {} } },
   );
 
