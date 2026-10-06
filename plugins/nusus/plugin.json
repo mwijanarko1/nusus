@@ -1,0 +1,36 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "nusus",
+  "version": "0.1.0",
+  "description": "Search and cite classical Islamic and Arabic texts from the Turath library with the nusus CLI.",
+  "author": {
+    "name": "Mikhail Wijanarko",
+    "url": "https://github.com/mwijanarko1"
+  },
+  "homepage": "https://github.com/mwijanarko1/nusus#readme",
+  "repository": "https://github.com/mwijanarko1/nusus",
+  "license": "MIT",
+  "keywords": ["turath", "shamela", "islamic-texts", "arabic-books", "hadith", "fiqh", "citations"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Nusus",
+        "shortDescription": "Cite classical Islamic texts",
+        "longDescription": "Search the Turath library of classical Islamic and Arabic books and answer with exact passages, book titles, page locators, and links back to the source. Covers hadith, fiqh, tafsir, biography, and other heritage texts. Nusus retrieves and cites sources; it does not grade hadith or issue fatwas. Requires an environment that can run Node.js 20+ with network access to api.turath.io.",
+        "developerName": "Mikhail Wijanarko",
+        "category": "Education",
+        "capabilities": ["Search classical books", "Retrieve cited passages", "Browse tables of contents"],
+        "websiteURL": "https://github.com/mwijanarko1/nusus",
+        "supportURL": "https://github.com/mwijanarko1/nusus/issues",
+        "defaultPrompt": [
+          "Find passages on intention (النية) in prayer and cite them.",
+          "What does al-Nawawi's Forty Hadith say in its first hadith?",
+          "List the books by Ibn Taymiyyah in the Turath catalog."
+        ],
+        "brandColor": "#1F6F5C",
+        "composerIcon": "./assets/icon.svg",
+        "logo": "./assets/icon.svg"
+      }
+    }
+  }
+}

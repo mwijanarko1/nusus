@@ -1,0 +1,20 @@
+{
+  "name": "nusus-local",
+  "interface": {
+    "displayName": "Nusus (local)"
+  },
+  "plugins": [
+    {
+      "name": "nusus",
+      "source": {
+        "source": "local",
+        "path": "./plugins/nusus"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Education"
+    }
+  ]
+}
