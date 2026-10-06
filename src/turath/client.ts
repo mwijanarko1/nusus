@@ -227,13 +227,17 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     to: number,
     center: number,
     signal?: AbortSignal,
+    pagePromises?: Map<string, Promise<Passage>>,
   ): Promise<Passage[]> => {
     const pageNumbers: number[] = [];
     for (let page = from; page <= to; page += 1) pageNumbers.push(page);
     const fetched = await Promise.all(
       pageNumbers.map(async (page) => {
         try {
-          return { page, passage: await getPage(book, page, { signal }) };
+          const key = `${book}:${page}`;
+          const pending = pagePromises?.get(key) ?? getPage(book, page, { signal });
+          pagePromises?.set(key, pending);
+          return { page, passage: await pending };
         } catch (error) {
           if (!(error instanceof NususError) || error.code !== "NOT_FOUND" || page === center) throw error;
           return undefined;
@@ -313,6 +317,7 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
     const first = await searchWithRaw(query, searchOptions);
     const hits = first.result.items.slice(0, maxPassages);
     const rawHits = first.rawHits.slice(0, maxPassages);
+    const pagePromises = new Map<string, Promise<Passage>>();
     for (let page = 2; hits.length < Math.min(maxPassages, first.result.totalMatches); page += 1) {
       const next = await searchWithRaw(first.result.effectiveQuery ?? query, { ...searchOptions, page });
       if (!next.result.items.length) break;
@@ -325,10 +330,25 @@ export const createTurathClient = (options: TurathClientOptions = {}) => {
         let page: Passage;
         if (hit.location.internalPage === undefined) {
           page = hit;
-        } else if (pagesBefore > 0 || pagesAfter > 0) {
-          page = await getContext(hit, { pagesBefore, pagesAfter, signal: options.signal });
         } else {
-          page = await getPage(hit.book.id, hit.location.internalPage, { signal: options.signal });
+          const center = hit.location.internalPage;
+          const key = `${hit.book.id}:${center}`;
+          if (pagesBefore > 0 || pagesAfter > 0) {
+            integer(center, "internal page", 1);
+            const pages = await fetchPageRange(
+              hit.book.id,
+              Math.max(1, center - pagesBefore),
+              center + pagesAfter,
+              center,
+              options.signal,
+              pagePromises,
+            );
+            page = buildContextPassage(hit, pages);
+          } else {
+            const pending = pagePromises.get(key) ?? getPage(hit.book.id, center, { signal: options.signal });
+            pagePromises.set(key, pending);
+            page = await pending;
+          }
         }
 
         const rawHit = rawHits[rank];

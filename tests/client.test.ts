@@ -417,6 +417,51 @@ describe("retrieve context and provenance", () => {
     }
   });
 
+  test("deduplicates overlapping context page requests within one retrieval", async () => {
+    const pagesRequested: string[] = [];
+    const overlapping = createTurathClient({
+      fetch: (async (input) => {
+        const url = new URL(String(input));
+        if (url.pathname.endsWith("/page")) {
+          const pg = url.searchParams.get("pg") ?? "?";
+          pagesRequested.push(pg);
+          return Response.json({
+            meta: JSON.stringify({ headings: [], page_id: Number(pg), page: Number(pg), book_name: "كتاب" }),
+            text: `نص الصفحة ${pg}`,
+          });
+        }
+        return Response.json({
+          count: 5,
+          data: [3, 4, 5, 6, 7].map((pg) => ({
+            book_id: 3,
+            meta: JSON.stringify({ headings: [], page_id: pg, page: pg, book_name: "كتاب" }),
+            snip: "نص",
+            text: `نص الصفحة ${pg}`,
+          })),
+        });
+      }),
+    });
+
+    const result = await overlapping.retrieve("نص", {
+      maxPassages: 5,
+      maxCharsPerPassage: 500,
+      pagesBefore: 2,
+      pagesAfter: 2,
+    });
+
+    expect(pagesRequested.sort((a, b) => Number(a) - Number(b))).toEqual(["1", "2", "3", "4", "5", "6", "7", "8", "9"]);
+    expect(result.passages).toHaveLength(5);
+    expect(result.passages.map((passage) => passage.segments?.map((segment) => segment.location.internalPage))).toEqual([
+      [1, 2, 3, 4, 5],
+      [2, 3, 4, 5, 6],
+      [3, 4, 5, 6, 7],
+      [4, 5, 6, 7, 8],
+      [5, 6, 7, 8, 9],
+    ]);
+    expect(result.passages[2]?.text).toContain("نص الصفحة 3\n\nنص الصفحة 4\n\nنص الصفحة 5\n\nنص الصفحة 6\n\nنص الصفحة 7");
+    expect(result.passages.every((passage) => passage.segments?.every((segment) => segment.citation))).toBe(true);
+  });
+
   test("echoes retrieve scope in provenance", async () => {
     const result = await client.retrieve("الإسلام", {
       maxPassages: 1,
